@@ -1,44 +1,40 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import pandas as pd
 import gspread
 from datetime import date
 import json
 from google.oauth2.service_account import Credentials
+import os
 
-# --- AUTH SETUP ---
-users = {
-    "usernames": {
-        "admin": {
-            "name": "Admin",
-            "password": stauth.Hasher(["adminpass"]).generate()[0]
-        },
-        "employee": {
-            "name": "Employee",
-            "password": stauth.Hasher(["employeepass"]).generate()[0]
-        }
-    }
-}
+# --- AUTH SETUP USING FILE ---
+def load_users():
+    if not os.path.exists("users.txt"):
+        with open("users.txt", "w") as f:
+            f.write("admin,adminpass\n")
+    users = {}
+    with open("users.txt", "r") as f:
+        for line in f:
+            username, password = line.strip().split(",")
+            users[username] = password
+    return users
 
-authenticator = stauth.Authenticate(
-    users["usernames"],
-    "employee_app_cookie", "abcdef", cookie_expiry_days=1
-)
-
-name, auth_status, username = authenticator.login("Login", "main")
-
-# --- LOGIN SCREEN CENTERED ---
-if auth_status is None:
-    st.markdown(
-        """
+def login(users):
+    st.markdown("""
         <style>
         .block-container { display: flex; justify-content: center; align-items: center; height: 90vh; }
         </style>
-        """, unsafe_allow_html=True
-    )
-    st.warning("Please enter your username and password")
-elif auth_status is False:
-    st.error("Username/password incorrect")
+    """, unsafe_allow_html=True)
+    st.title("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if username in users and users[username] == password:
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = username
+            st.session_state["name"] = username.capitalize()
+            st.experimental_rerun()
+        else:
+            st.error("Invalid credentials")
 
 # --- GOOGLE SHEET CONNECTION ---
 @st.cache_resource
@@ -51,9 +47,20 @@ def load_gsheet():
     return client.open("EmployeeData").worksheet("Employees")
 
 sheet = load_gsheet()
+users = load_users()
 
-# --- LOGGED IN VIEW ---
-if auth_status:
+# --- SESSION MANAGEMENT ---
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+    st.session_state["username"] = ""
+    st.session_state["name"] = ""
+
+if not st.session_state["logged_in"]:
+    login(users)
+else:
+    username = st.session_state["username"]
+    name = st.session_state["name"]
+
     # Top right logout button
     st.markdown("""
         <style>
@@ -61,7 +68,9 @@ if auth_status:
         </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="logout-button">', unsafe_allow_html=True)
-    authenticator.logout("Logout")
+    if st.button("Logout"):
+        st.session_state["logged_in"] = False
+        st.experimental_rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.sidebar.success(f"Welcome, {name} \U0001F44B")
@@ -95,10 +104,10 @@ if auth_status:
     with tabs[2]:  # Leaves
         st.title("\U0001F4DD Apply for Leave")
         if not df.empty:
-            name = st.selectbox("Select Employee", df['name'])
+            emp_name = st.selectbox("Select Employee", df['name'])
             reason = st.text_input("Reason for Leave")
             if st.button("Apply for Leave"):
-                st.success(f"{name} applied for leave: {reason}")
+                st.success(f"{emp_name} applied for leave: {reason}")
         else:
             st.info("No employees available.")
 
