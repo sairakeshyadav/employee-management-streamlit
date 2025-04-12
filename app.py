@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import gspread
 from datetime import date
-import json
-from google.oauth2.service_account import Credentials
 import os
 
 # --- AUTH SETUP USING FILE ---
@@ -36,17 +33,14 @@ def login(users):
         else:
             st.error("Invalid credentials")
 
-# --- GOOGLE SHEET CONNECTION ---
-@st.cache_resource
+# --- DUMMY EMPLOYEE DATA ---
+def load_dummy_data():
+    data = [
+        {"id": "1", "name": "Alice", "email": "alice@example.com", "role": "Engineer", "department": "Tech", "status": "active", "doj": "2022-01-01"},
+        {"id": "2", "name": "Bob", "email": "bob@example.com", "role": "Designer", "department": "Design", "status": "active", "doj": "2022-03-15"},
+    ]
+    return pd.DataFrame(data)
 
-def load_gsheet():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    info = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT"])
-    creds = Credentials.from_service_account_info(info, scopes=scope)
-    client = gspread.authorize(creds)
-    return client.open("EmployeeData").worksheet("Employees")
-
-sheet = load_gsheet()
 users = load_users()
 
 # --- SESSION MANAGEMENT ---
@@ -79,8 +73,7 @@ else:
     tabs = st.tabs(["\U0001F4CA Dashboard", "\U0001F4C5 Attendance", "\U0001F4DD Leaves", "\U0001F465 Employees"])
 
     # Load employee data
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data)
+    df = load_dummy_data()
 
     with tabs[0]:  # Dashboard
         st.title("\U0001F4CA Dashboard Overview")
@@ -134,18 +127,12 @@ else:
         new_doj = st.date_input("Date of Joining")
 
         if st.button("Add Employee"):
-            new_row = [str(len(df)+1), new_name, new_email, new_role, new_dept, new_status, str(new_doj)]
-            sheet.append_row(new_row)
+            new_row = pd.DataFrame([{"id": str(len(df)+1), "name": new_name, "email": new_email, "role": new_role, "department": new_dept, "status": new_status, "doj": str(new_doj)}])
+            df = pd.concat([df, new_row], ignore_index=True)
             st.success(f"Added {new_name} to the employee list!")
 
         st.subheader("\u274C Delete Employee by ID")
         del_id = st.text_input("Enter Employee ID to Delete")
         if st.button("Delete"):
-            records = sheet.get_all_records()
-            for i, row in enumerate(records):
-                if row["id"] == del_id:
-                    sheet.delete_rows(i + 2)
-                    st.success(f"Deleted employee ID {del_id}")
-                    break
-            else:
-                st.error("ID not found")
+            df = df[df['id'] != del_id]
+            st.success(f"Deleted employee ID {del_id}")
