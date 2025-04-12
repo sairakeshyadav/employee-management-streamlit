@@ -29,7 +29,6 @@ def login(users):
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["name"] = username.capitalize()
-            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
 
@@ -41,6 +40,7 @@ def load_dummy_data():
     ]
     return pd.DataFrame(data)
 
+# Load users from file
 users = load_users()
 
 # --- SESSION MANAGEMENT ---
@@ -49,8 +49,9 @@ if "logged_in" not in st.session_state:
     st.session_state["username"] = ""
     st.session_state["name"] = ""
 
+# Check if the user is logged in
 if not st.session_state["logged_in"]:
-    login(users)
+    login(users)  # Show login page if not logged in
 else:
     username = st.session_state["username"]
     name = st.session_state["name"]
@@ -63,8 +64,7 @@ else:
     """, unsafe_allow_html=True)
     st.markdown('<div class="logout-button">', unsafe_allow_html=True)
     if st.button("Logout"):
-        st.session_state["logged_in"] = False
-        st.experimental_rerun()
+        st.session_state["logged_in"] = False  # Logout action
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.sidebar.success(f"Welcome, {name} \U0001F44B")
