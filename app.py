@@ -54,7 +54,16 @@ sheet = load_gsheet()
 
 # --- LOGGED IN VIEW ---
 if auth_status:
-    authenticator.logout("Logout", "sidebar")
+    # Top right logout button
+    st.markdown("""
+        <style>
+        .logout-button { position: absolute; top: 10px; right: 10px; }
+        </style>
+    """, unsafe_allow_html=True)
+    st.markdown('<div class="logout-button">', unsafe_allow_html=True)
+    authenticator.logout("Logout")
+    st.markdown('</div>', unsafe_allow_html=True)
+
     st.sidebar.success(f"Welcome, {name} \U0001F44B")
 
     # --- MAIN TABS ---
