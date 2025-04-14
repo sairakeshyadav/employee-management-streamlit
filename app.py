@@ -35,7 +35,7 @@ def login():
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["role"] = DEFAULT_ADMIN_ROLE
-            st.legacy_caching.clear_cache()  # Clear cache and refresh page after successful login
+            st.experimental_rerun()  # Refresh the page after successful login
         else:
             st.error("Invalid credentials")
 
@@ -54,7 +54,7 @@ else:
     if st.sidebar.button("Logout"):
         for key in ["logged_in", "username", "role"]:
             st.session_state.pop(key, None)
-        st.legacy_caching.clear_cache()  # Clear cache and reset session state after logout
+        st.experimental_rerun()  # Reset session state and refresh after logout
 
     # --- Dashboard Tab ---
     if choice == "Dashboard":
