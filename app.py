@@ -16,7 +16,7 @@ def initialize_database():
     """Initialize the database and create necessary tables."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
+
     # Create employees table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS employees (
@@ -29,7 +29,7 @@ def initialize_database():
             doj TEXT NOT NULL
         )
     """)
-    
+
     # Create attendance table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
@@ -40,7 +40,7 @@ def initialize_database():
             FOREIGN KEY (employee_id) REFERENCES employees (id)
         )
     """)
-    
+
     # Create users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -49,7 +49,7 @@ def initialize_database():
             role TEXT NOT NULL
         )
     """)
-    
+
     # Add default admin credentials if not already present
     cursor.execute("SELECT * FROM users WHERE username = ?", (DEFAULT_ADMIN_USERNAME,))
     if cursor.fetchone() is None:
@@ -58,7 +58,7 @@ def initialize_database():
             VALUES (?, ?, ?)
         """, (DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, "admin"))
         st.info("Default admin credentials added: Username='admin', Password='admin123'")
-    
+
     conn.commit()
     conn.close()
 
