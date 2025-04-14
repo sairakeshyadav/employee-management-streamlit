@@ -42,7 +42,7 @@ def login(users):
                 st.session_state["username"] = username
                 st.session_state["role"] = users[username]["role"]
                 st.session_state.login_failed = False
-                st.success("Login successful. Please reload the page.")
+                st.success("Login successful. Please click login again.")
                 st.stop()
             else:
                 st.session_state.login_failed = True
