@@ -1,12 +1,77 @@
-if not st.session_state.get("logged_in", False):
+import streamlit as st
+import pandas as pd
+import sqlite3
+from datetime import date
+
+# --- Initialize Session State ---
+# Ensure session state variables are initialized before accessing them
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+if "username" not in st.session_state:
+    st.session_state["username"] = ""
+if "role" not in st.session_state:
+    st.session_state["role"] = ""
+
+# --- DATABASE CONNECTION FUNCTIONS ---
+def get_connection():
+    """Establish a connection to the database."""
+    return sqlite3.connect("employee_management.db")
+
+def load_data(query, params=()):
+    """Load data from the database and return it as a DataFrame."""
+    try:
+        conn = get_connection()
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
+
+def execute_query(query, params=()):
+    """Execute a query in the database."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Database operation failed: {e}")
+
+# --- LOGIN FUNCTION ---
+def login():
+    """Display the login interface and handle authentication."""
+    st.title("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password", placeholder="Enter your password")
+    
+    if st.button("Login"):
+        try:
+            query = "SELECT username, role FROM users WHERE username = ? AND password = ?"
+            user_df = load_data(query, (username, password))
+
+            if not user_df.empty:
+                user = user_df.iloc[0]
+                st.session_state["logged_in"] = True
+                st.session_state["username"] = user["username"]
+                st.session_state["role"] = user["role"]
+                st.success(f"Welcome, {username}!")
+            else:
+                st.error("Invalid username or password. Please try again.")
+        except Exception as e:
+            st.error(f"An error occurred during login: {e}")
+
+# --- MAIN APPLICATION ---
+if not st.session_state["logged_in"]:
     login()
 else:
     # Sidebar for logout and user details
     st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
-    st.sidebar.success(f"Logged in as: {st.session_state.get('username', '')}")
+    st.sidebar.success(f"Logged in as: {st.session_state['username']}")
     
     # Tabs for the app
-    if st.session_state.get("role", "") == "admin":
+    if st.session_state["role"] == "admin":
         tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
     else:
         tabs = st.tabs(["Dashboard", "Employees", "Attendance"])
@@ -34,7 +99,7 @@ else:
         st.info("Attendance tracking functionality goes here.")
     
     # Admin Management Tab (only visible for admin users)
-    if st.session_state.get("role", "") == "admin":
+    if st.session_state["role"] == "admin":
         with tabs[3]:
             st.title("Admin Management")
             
