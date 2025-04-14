@@ -5,10 +5,12 @@ import os
 
 # --- AUTH SETUP USING FILE ---
 def load_users():
+    # Set default admin credentials if the file doesn't exist or is empty
     default_user = "admin,admin123,admin"
     if not os.path.exists("users.txt") or os.stat("users.txt").st_size == 0:
         with open("users.txt", "w") as f:
             f.write(default_user + "\n")
+
     users = {}
     with open("users.txt", "r") as f:
         for line in f:
@@ -25,6 +27,8 @@ if not os.path.exists("employees.csv"):
     pd.DataFrame(columns=["ID", "Name", "Department", "Join Date", "Role"]).to_csv("employees.csv", index=False)
 if not os.path.exists("attendance.csv"):
     pd.DataFrame(columns=["ID", "Name", "Date", "Status"]).to_csv("attendance.csv", index=False)
+if not os.path.exists("leaves.csv"):
+    pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
 
 # --- LOGIN ---
 def login(users):
@@ -106,8 +110,6 @@ else:
 
     elif choice == "Leave Management":
         st.title("📝 Leave Management")
-        if not os.path.exists("leaves.csv"):
-            pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
         leave_df = pd.read_csv("leaves.csv")
 
         st.subheader("Apply for Leave")
