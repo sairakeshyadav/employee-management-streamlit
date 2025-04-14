@@ -71,6 +71,8 @@ else:
     tabs = ["Dashboard", "Attendance", "Employees", "Leave Management"]
     if st.session_state["role"] == "admin":
         tabs.append("Admin Panel")
+    elif st.session_state["role"] == "manager":
+        tabs.append("Manager Panel")
 
     choice = st.sidebar.radio("Go to", tabs)
 
@@ -147,7 +149,7 @@ else:
             name = st.text_input("Name")
             dept = st.text_input("Department")
             join = st.date_input("Join Date", date.today())
-            role = st.selectbox("Role", ["employee", "admin"])
+            role = st.selectbox("Role", ["employee", "admin", "manager"])
             submitted = st.form_submit_button("Add Employee")
             if submitted:
                 new_emp = pd.DataFrame([[emp_id, name, dept, join, role]],
@@ -161,7 +163,7 @@ else:
         with st.form("add_user"):
             new_user = st.text_input("Username")
             new_pass = st.text_input("Password", type="password")
-            new_role = st.selectbox("Role", ["employee", "admin"])
+            new_role = st.selectbox("Role", ["employee", "admin", "manager"])
             add_user_btn = st.form_submit_button("Add User")
             if add_user_btn:
                 # Store new user in the users.txt file
@@ -183,3 +185,15 @@ else:
                     leave_df.at[idx, "Status"] = "Rejected"
         leave_df.to_csv("leaves.csv", index=False)
         st.success("Leave requests updated.")
+
+    elif choice == "Manager Panel" and st.session_state["role"] == "manager":
+        st.title("⚙️ Manager Panel")
+
+        st.subheader("Review Leave Requests")
+        leave_df = pd.read_csv("leaves.csv")
+        for idx, row in leave_df[leave_df["Status"] == "Pending"].iterrows():
+            st.write(f"User: {row['Username']} | From: {row['From']} | To: {row['To']} | Reason: {row['Reason']}")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"Approve {idx}"):
+                    leave_df.at[idx, "Status"]
