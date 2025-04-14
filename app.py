@@ -110,11 +110,14 @@ else:
     st.sidebar.success(f"Logged in as: {st.session_state['username']}")
     
     # Tabs for the app
+    tabs = ["Dashboard", "Employees", "Attendance"]
+
+    # Add "Admin Management" tab only for admin users
     if st.session_state["role"] == "admin":
-        tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
-    else:
-        tabs = st.tabs(["Dashboard", "Employees", "Attendance"])
-    
+        tabs.append("Admin Management")
+
+    tabs = st.tabs(tabs)
+
     # Dashboard Tab
     with tabs[0]:
         st.title("Dashboard")
@@ -139,7 +142,7 @@ else:
     
     # Admin Management Tab (only visible for admin users)
     if st.session_state["role"] == "admin":
-        with tabs[3]:
+        with tabs[-1]:  # The last tab is "Admin Management" for admins
             st.title("Admin Management")
             
             # Add User
@@ -190,7 +193,7 @@ else:
                         st.info("User deletion canceled.")
                 else:
                     st.warning("Please provide a username to delete.")
-            
+
             # Show Existing Users
             st.subheader("Existing Users")
             try:
