@@ -35,7 +35,8 @@ def login():
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["role"] = DEFAULT_ADMIN_ROLE
-            st.experimental_rerun()  # Refresh the page after successful login
+            # Redirect to the main page after login
+            st.session_state["login_successful"] = True
         else:
             st.error("Invalid credentials")
 
@@ -52,9 +53,11 @@ else:
 
     st.sidebar.write(f"Logged in as: {st.session_state['username']} ({st.session_state['role']})")
     if st.sidebar.button("Logout"):
-        for key in ["logged_in", "username", "role"]:
+        # Clear the session state upon logout
+        for key in ["logged_in", "username", "role", "login_successful"]:
             st.session_state.pop(key, None)
-        st.experimental_rerun()  # Reset session state and refresh after logout
+        st.session_state["logged_in"] = False
+        st.experimental_rerun()  # Refresh after logout to go back to login page
 
     # --- Dashboard Tab ---
     if choice == "Dashboard":
