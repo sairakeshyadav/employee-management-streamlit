@@ -48,7 +48,7 @@ def login(users):
                 st.session_state.login_failed = True
 
     if st.session_state.login_failed:
-        st.error("Invalid credentials")
+        st.error("ah look whos trying to login xD")
 
 # --- MAIN APP ---
 users = load_users()
