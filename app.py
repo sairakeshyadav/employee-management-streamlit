@@ -5,10 +5,15 @@ import os
 
 # --- AUTH SETUP USING FILE ---
 def load_users():
+    # Default admin credentials
     default_user = "admin,admin123,admin"
+    
+    # Check if users.txt exists, if not create it with the default user
     if not os.path.exists("users.txt"):
         with open("users.txt", "w") as f:
             f.write(default_user + "\n")
+    
+    # Load users from the users.txt file
     users = {}
     with open("users.txt", "r") as f:
         for line in f:
@@ -35,12 +40,14 @@ def login(users):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
+    
     if submitted:
+        # Check if credentials match
         if username in users and users[username]["password"] == password:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["role"] = users[username]["role"]
-            st.experimental_rerun()
+            st.experimental_rerun()  # Refresh page after successful login
         else:
             st.error("Invalid credentials")
 
@@ -60,8 +67,9 @@ else:
     if st.sidebar.button("Logout"):
         for key in ["logged_in", "username", "role"]:
             st.session_state.pop(key, None)
-        st.experimental_rerun()
+        st.experimental_rerun()  # Refresh page after logout
 
+    # --- Dashboard Tab ---
     if choice == "Dashboard":
         st.title("📊 Employee Analytics Dashboard")
         emp_df = pd.read_csv("employees.csv")
@@ -70,6 +78,7 @@ else:
         st.metric("Attendance Records", len(att_df))
         st.dataframe(emp_df.describe(include='all'))
 
+    # --- Attendance Tab ---
     elif choice == "Attendance":
         st.title("📅 Attendance Tracking")
         att_df = pd.read_csv("attendance.csv")
@@ -81,6 +90,7 @@ else:
         else:
             st.info("No attendance data available to export.")
 
+    # --- Employees Tab ---
     elif choice == "Employees":
         st.title("🧾 Employee Directory")
         emp_df = pd.read_csv("employees.csv")
@@ -97,6 +107,7 @@ else:
         else:
             st.info("No employee data to export.")
 
+    # --- Leave Management Tab ---
     elif choice == "Leave Management":
         st.title("📝 Leave Management")
         leave_df = pd.read_csv("leaves.csv")
@@ -117,6 +128,7 @@ else:
         st.subheader("Leave History")
         st.dataframe(leave_df[leave_df["Username"] == st.session_state["username"]])
 
+    # --- Admin Panel Tab (For Admin users only) ---
     elif choice == "Admin Panel" and st.session_state["role"] == "admin":
         st.title("⚙️ Admin Panel")
 
