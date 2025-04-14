@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import bcrypt
 from datetime import date
 
 # --- Initialize Session State ---
-# Ensure session state variables are initialized before accessing them
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "username" not in st.session_state:
@@ -39,6 +39,25 @@ def execute_query(query, params=()):
     except Exception as e:
         st.error(f"Database operation failed: {e}")
 
+# --- HELPER FUNCTIONS ---
+def hash_password(password):
+    """Hash a password using bcrypt."""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+def verify_password(password, hashed_password):
+    """Verify a password against its hash using bcrypt."""
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
+
+def validate_input(username, password):
+    """Validate input for username and password."""
+    if len(username) < 3:
+        st.warning("Username must be at least 3 characters long.")
+        return False
+    if len(password) < 6:
+        st.warning("Password must be at least 6 characters long.")
+        return False
+    return True
+
 # --- LOGIN FUNCTION ---
 def login():
     """Display the login interface and handle authentication."""
@@ -48,17 +67,20 @@ def login():
     
     if st.button("Login"):
         try:
-            query = "SELECT username, role FROM users WHERE username = ? AND password = ?"
-            user_df = load_data(query, (username, password))
-
+            query = "SELECT username, password, role FROM users WHERE username = ?"
+            user_df = load_data(query, (username,))
             if not user_df.empty:
                 user = user_df.iloc[0]
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = user["username"]
-                st.session_state["role"] = user["role"]
-                st.success(f"Welcome, {username}!")
+                hashed_password = user["password"]
+                if verify_password(password, hashed_password):
+                    st.session_state["logged_in"] = True
+                    st.session_state["username"] = user["username"]
+                    st.session_state["role"] = user["role"]
+                    st.success(f"Welcome, {username}!")
+                else:
+                    st.error("Invalid password. Please try again.")
             else:
-                st.error("Invalid username or password. Please try again.")
+                st.error("Invalid username. Please try again.")
         except Exception as e:
             st.error(f"An error occurred during login: {e}")
 
@@ -109,17 +131,16 @@ else:
             new_password = st.text_input("New Password", type="password", placeholder="Enter password for new user")
             new_role = st.selectbox("Role", ["admin", "user"])
             if st.button("Add User"):
-                if new_username and new_password:
+                if validate_input(new_username, new_password):
                     try:
+                        hashed_password = hash_password(new_password)
                         execute_query(
                             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                            (new_username, new_password, new_role),
+                            (new_username, hashed_password, new_role),
                         )
                         st.success(f"User '{new_username}' added successfully!")
                     except Exception as e:
                         st.error(f"Error adding user: {e}")
-                else:
-                    st.warning("Please provide both username and password.")
             
             # Reset Password
             st.subheader("Reset Password")
@@ -128,35 +149,37 @@ else:
                 "New Password", type="password", placeholder="Enter new password", key="reset_new_password"
             )
             if st.button("Reset Password"):
-                if reset_username and reset_new_password:
+                if validate_input(reset_username, reset_new_password):
                     try:
+                        hashed_password = hash_password(reset_new_password)
                         execute_query(
                             "UPDATE users SET password = ? WHERE username = ?",
-                            (reset_new_password, reset_username),
+                            (hashed_password, reset_username),
                         )
                         st.success(f"Password for '{reset_username}' has been reset.")
                     except Exception as e:
                         st.error(f"Error resetting password: {e}")
-                else:
-                    st.warning("Please provide both username and new password.")
             
             # Delete User
             st.subheader("Delete User")
             delete_username = st.text_input("Username to Delete", key="delete_username")
             if st.button("Delete User"):
                 if delete_username:
-                    try:
-                        execute_query("DELETE FROM users WHERE username = ?", (delete_username,))
-                        st.success(f"User '{delete_username}' has been deleted.")
-                    except Exception as e:
-                        st.error(f"Error deleting user: {e}")
+                    if st.confirm("Are you sure you want to delete this user?"):
+                        try:
+                            execute_query("DELETE FROM users WHERE username = ?", (delete_username,))
+                            st.success(f"User '{delete_username}' has been deleted.")
+                        except Exception as e:
+                            st.error(f"Error deleting user: {e}")
+                    else:
+                        st.info("User deletion canceled.")
                 else:
                     st.warning("Please provide a username to delete.")
             
             # Show Existing Users
             st.subheader("Existing Users")
             try:
-                user_df = load_data("SELECT * FROM users")
+                user_df = load_data("SELECT username, role FROM users")
                 if not user_df.empty:
                     st.dataframe(user_df)
                 else:
