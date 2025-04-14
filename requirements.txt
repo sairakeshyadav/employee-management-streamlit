@@ -3,3 +3,5 @@ streamlit-authenticator
 pandas
 gspread
 google-auth
+matplotlib
+seaborn
