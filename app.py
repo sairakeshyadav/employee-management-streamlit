@@ -105,17 +105,22 @@ def login():
     st.title("Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password", placeholder="Enter your password")
+    
     if st.button("Login"):
-        query = "SELECT * FROM users WHERE username = ? AND password = ?"
-        user = load_data(query, (username, password)).iloc[0] if not load_data(query, (username, password)).empty else None
+        try:
+            query = "SELECT username, role FROM users WHERE username = ? AND password = ?"
+            user_df = load_data(query, (username, password))
 
-        if user is not None:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = user["username"]
-            st.session_state["role"] = user["role"]
-            st.success(f"Welcome, {username}!")
-        else:
-            st.error("Invalid username or password. Please try again.")
+            if not user_df.empty:
+                user = user_df.iloc[0]
+                st.session_state["logged_in"] = True
+                st.session_state["username"] = user["username"]
+                st.session_state["role"] = user["role"]
+                st.success(f"Welcome, {username}!")
+            else:
+                st.error("Invalid username or password. Please try again.")
+        except Exception as e:
+            st.error(f"An error occurred during login: {e}")
 
 if not st.session_state["logged_in"]:
     login()
