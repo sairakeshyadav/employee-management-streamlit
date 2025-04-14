@@ -1,98 +1,109 @@
-To implement new features, fix bugs, and optimize the code, I'll make the following improvements and additions to the `app.py` file:
-
-### Improvements and New Features:
-1. **Secure Authentication**:
-   - Replace hardcoded credentials with an environment variable or external configuration.
-
-2. **Database Integration**:
-   - Replace the CSV file with SQLite to handle concurrent access and improve scalability.
-
-3. **Attendance Persistence**:
-   - Enable attendance data to be stored and retrieved from the database.
-
-4. **Improved Search**:
-   - Enhance the employee search to handle edge cases like empty inputs and special characters.
-
-5. **Unique Employee IDs**:
-   - Use UUIDs for unique employee identification instead of relying on the length of the existing dataset.
-
-6. **Error Handling**:
-   - Add proper error handling for invalid inputs or corrupted data.
-
-7. **Admin Dashboard Enhancements**:
-   - Add a feature to view attendance and leave history for employees.
-
-8. **UI/UX Enhancements**:
-   - Improve layout and responsiveness for better user experience.
-
-9. **Code Optimization**:
-   - Refactor repeated code into reusable functions.
-
-I will now rewrite the updated version of the code.Here's a refactored version of the code with bug fixes, optimizations, and new features:
-
-### Changes Implemented:
-1. **New Features**:
-   - Added attendance persistence to save attendance data.
-   - Added an export feature to download employee data as a CSV file.
-   - Added better password handling using hashed passwords (no plaintext passwords).
-
-2. **Bug Fixes**:
-   - Fixed race conditions by ensuring data is locked when read/write operations occur.
-   - Improved error handling for employee edits and deletions.
-
-3. **Optimizations**:
-   - Replaced hardcoded credentials with environment variables for better security.
-   - Introduced UUIDs for unique employee IDs.
-   - Improved data filtering to handle empty or invalid search inputs.
-
-```python
 import streamlit as st
 import pandas as pd
-from datetime import date
-import os
+import sqlite3
+from datetime import date, datetime
 import uuid
-import hashlib
+import os
 
-# --- EMPLOYEE DATA MANAGEMENT ---
-EMPLOYEE_FILE = "employees.csv"
-ATTENDANCE_FILE = "attendance.csv"
+# --- DATABASE MANAGEMENT ---
+DB_FILE = "employee_management.db"
 
-def load_csv(file_path, default_data=None):
-    if not os.path.exists(file_path):
-        if default_data is not None:
-            df = pd.DataFrame(default_data)
-            df.to_csv(file_path, index=False)
-        else:
-            df = pd.DataFrame()
-    else:
-        df = pd.read_csv(file_path)
+def initialize_database():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    # Create employees table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS employees (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            role TEXT NOT NULL,
+            department TEXT NOT NULL,
+            status TEXT NOT NULL,
+            doj TEXT NOT NULL
+        )
+    """)
+    # Create attendance table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            status TEXT NOT NULL,
+            FOREIGN KEY (employee_id) REFERENCES employees (id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def get_connection():
+    return sqlite3.connect(DB_FILE)
+
+# --- DATA OPERATIONS ---
+def load_employee_data():
+    conn = get_connection()
+    df = pd.read_sql_query("SELECT * FROM employees", conn)
+    conn.close()
     return df
 
-def save_csv(df, file_path):
-    df.to_csv(file_path, index=False)
+def save_employee(employee):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO employees (id, name, email, role, department, status, doj)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, employee)
+    conn.commit()
+    conn.close()
 
-def load_employee_data():
-    default_employees = [
-        {"id": str(uuid.uuid4()), "name": "Alice", "email": "alice@example.com", "role": "Engineer", "department": "Tech", "status": "active", "doj": "2022-01-01"},
-        {"id": str(uuid.uuid4()), "name": "Bob", "email": "bob@example.com", "role": "Designer", "department": "Design", "status": "active", "doj": "2022-03-15"},
-    ]
-    return load_csv(EMPLOYEE_FILE, default_employees)
+def update_employee(employee_id, updated_data):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE employees
+        SET name = ?, email = ?, role = ?, department = ?, status = ?, doj = ?
+        WHERE id = ?
+    """, (*updated_data, employee_id))
+    conn.commit()
+    conn.close()
 
-def load_attendance_data():
-    return load_csv(ATTENDANCE_FILE)
+def delete_employee(employee_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM employees WHERE id = ?", (employee_id,))
+    conn.commit()
+    conn.close()
 
-def save_employee_data(df):
-    save_csv(df, EMPLOYEE_FILE)
+def save_attendance(attendance_data):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO attendance (employee_id, date, status)
+        VALUES (?, ?, ?)
+    """, attendance_data)
+    conn.commit()
+    conn.close()
 
-def save_attendance_data(df):
-    save_csv(df, ATTENDANCE_FILE)
+def load_attendance_summary():
+    conn = get_connection()
+    df = pd.read_sql_query("""
+        SELECT employee_id, status, COUNT(*) as count
+        FROM attendance
+        GROUP BY employee_id, status
+    """, conn)
+    conn.close()
+    return df
 
-# --- UTILITIES ---
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+# --- STREAMLIT APP ---
+# Initialize database
+initialize_database()
 
-def verify_password(input_password, hashed_password):
-    return hash_password(input_password) == hashed_password
+# --- SESSION MANAGEMENT ---
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+    st.session_state["username"] = ""
+    st.session_state["name"] = ""
+    st.session_state["role"] = ""
 
 # --- LOGIN UI ---
 def login():
@@ -107,11 +118,8 @@ def login():
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     
-    admin_username = os.getenv("ADMIN_USERNAME", "admin")
-    admin_password_hash = os.getenv("ADMIN_PASSWORD_HASH", hash_password("admin123"))
-
     if st.button("Login"):
-        if username == admin_username and verify_password(password, admin_password_hash):
+        if username == "admin" and password == "admin123":  # Replace with hashed password in production
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["role"] = "admin"
@@ -120,64 +128,60 @@ def login():
         else:
             st.error("Invalid credentials")
 
-# --- SESSION MANAGEMENT ---
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-    st.session_state["username"] = ""
-    st.session_state["name"] = ""
-    st.session_state["role"] = ""
-
-# If not logged in, show login screen
+# --- MAIN APP ---
 if not st.session_state["logged_in"]:
     login()
 else:
-    # Logged in, proceed to main content
-    username = st.session_state["username"]
-    name = st.session_state["name"]
-    role = st.session_state["role"]
-
     # Top right logout button
-    st.markdown("""
-        <style>
-        .logout-button { position: absolute; top: 10px; right: 10px; }
-        </style>
-    """, unsafe_allow_html=True)
-    if st.button("Logout"):
-        st.session_state.clear()
-
-    st.sidebar.success(f"Welcome, {name} 👋")
+    st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
+    st.sidebar.success(f"Welcome, {st.session_state['name']} \U0001F44B")
 
     # --- MAIN TABS ---
-    tabs = st.tabs(["📊 Dashboard", "📅 Attendance", "📝 Leaves", "👥 Employees"])
+    tabs = st.tabs(["\U0001F4CA Dashboard", "\U0001F4C5 Attendance", "\U0001F4DD Leaves", "\U0001F465 Employees"])
 
-    # Load employee data
-    df = load_employee_data()
-    attendance_df = load_attendance_data()
+    # --- DASHBOARD ---
+    with tabs[0]:
+        st.title("\U0001F4CA Dashboard Overview")
+        df = load_employee_data()
 
-    with tabs[0]:  # Dashboard
-        st.title("📊 Dashboard Overview")
+        # Employee Overview
+        total_employees = len(df)
+        active_employees = len(df[df['status'] == 'active'])
+        inactive_employees = len(df[df['status'] == 'inactive'])
+        st.metric("Total Employees", total_employees)
+        st.metric("Active Employees", active_employees)
+        st.metric("Inactive Employees", inactive_employees)
+
+        # Department Distribution
+        st.subheader("Employees by Department")
         if not df.empty:
-            st.subheader("Employees by Department")
             st.bar_chart(df['department'].value_counts())
         else:
             st.info("No employee data available.")
 
-    with tabs[1]:  # Attendance
-        st.title("📅 Mark Attendance")
+        # Attendance Summary
+        st.subheader("Attendance Summary")
+        attendance_summary = load_attendance_summary()
+        st.dataframe(attendance_summary)
+
+    # --- ATTENDANCE ---
+    with tabs[1]:
+        st.title("\U0001F4C5 Mark Attendance")
+        df = load_employee_data()
         today = date.today().isoformat()
         if not df.empty:
             for _, emp in df.iterrows():
                 status = st.selectbox(f"{emp['name']} - {today}", ["present", "absent"], key=f"attendance_{emp['id']}")
-                if st.button(f"Mark {emp['name']}", key=f"mark_attendance_{emp['id']}"):
-                    new_row = {"id": emp["id"], "name": emp["name"], "date": today, "status": status}
-                    attendance_df = pd.concat([attendance_df, pd.DataFrame([new_row])], ignore_index=True)
-                    save_attendance_data(attendance_df)
+                if st.button(f"Mark {emp['name']}", key=f"mark_{emp['id']}"):
+                    save_attendance((emp['id'], today, status))
                     st.success(f"{emp['name']} marked as {status}")
         else:
             st.info("No employees to mark attendance for.")
 
-    with tabs[2]:  # Leaves
-        st.title("📝 Apply for Leave")
+    # --- LEAVES ---
+    with tabs[2]:
+        st.title("\U0001F4DD Apply for Leave")
+        df = load_employee_data()
         if not df.empty:
             emp_name = st.selectbox("Select Employee", df['name'])
             reason = st.text_input("Reason for Leave")
@@ -186,58 +190,50 @@ else:
         else:
             st.info("No employees available.")
 
-    with tabs[3]:  # Employees
-        st.title("👥 Employee Directory")
+    # --- EMPLOYEES ---
+    with tabs[3]:
+        st.title("\U0001F465 Employee Directory")
+        df = load_employee_data()
         search = st.text_input("Search by name")
-        if search.strip():
-            filtered = df[df['name'].str.contains(search, case=False, na=False)]
-            st.dataframe(filtered)
-        else:
-            st.dataframe(df)
+        filtered = df[df['name'].str.contains(search, case=False, na=False)] if search else df
+        st.dataframe(filtered)
 
-        if st.button("Export Employee Data"):
-            st.download_button(
-                label="Download Employee Data as CSV",
-                data=df.to_csv(index=False).encode('utf-8'),
-                file_name='employees.csv',
-                mime='text/csv'
-            )
+        # Add Employee
+        if st.session_state["role"] == "admin":
+            st.subheader("➕ Add New Employee")
+            new_name = st.text_input("Name")
+            new_email = st.text_input("Email")
+            new_role = st.text_input("Role")
+            new_dept = st.text_input("Department")
+            new_status = st.selectbox("Status", ["active", "inactive"])
+            new_doj = st.date_input("Date of Joining")
+            if st.button("Add Employee"):
+                new_id = str(uuid.uuid4())
+                save_employee((new_id, new_name, new_email, new_role, new_dept, new_status, new_doj.isoformat()))
+                st.success(f"Added {new_name} to the employee list!")
 
-    # --- ADMIN PANEL ---
-    if role == "admin":
-        st.markdown("---")
-        st.header("⚙️ Admin Panel – Manage Employees")
-
-        st.subheader("➕ Add New Employee")
-        new_name = st.text_input("Name")
-        new_email = st.text_input("Email")
-        new_role = st.text_input("Role")
-        new_dept = st.text_input("Department")
-        new_status = st.selectbox("Status", ["active", "inactive"])
-        new_doj = st.date_input("Date of Joining")
-
-        if st.button("Add Employee"):
-            new_row = pd.DataFrame([{"id": str(uuid.uuid4()), "name": new_name, "email": new_email, "role": new_role, "department": new_dept, "status": new_status, "doj": str(new_doj)}])
-            df = pd.concat([df, new_row], ignore_index=True)
-            save_employee_data(df)
-            st.success(f"Added {new_name} to the employee list!")
-
-        st.subheader("❌ Delete Employee by ID")
-        del_id = st.text_input("Enter Employee ID to Delete")
-        if st.button("Delete"):
-            if del_id in df['id'].values:
-                df = df[df['id'] != del_id]
-                save_employee_data(df)
+            # Delete Employee
+            st.subheader("❌ Delete Employee by ID")
+            del_id = st.text_input("Enter Employee ID to Delete")
+            if st.button("Delete Employee"):
+                delete_employee(del_id)
                 st.success(f"Deleted employee ID {del_id}")
-            else:
-                st.warning("Employee ID not found.")
 
-        st.subheader("✏️ Edit Employee")
-        edit_id = st.text_input("Enter Employee ID to Edit")
-        if edit_id in df['id'].values:
-            emp_row = df[df['id'] == edit_id].iloc[0]
-            new_name = st.text_input("New Name", emp_row['name'])
-            new_email = st.text_input("New Email", emp_row['email'])
-            new_role = st.text_input("New Role", emp_row['role'])
-            new_dept = st.text_input("New Department", emp_row['department'])
-            new_status = st.selectbox("New Status", ["active", "inactive"], index=["active", "inactive"].index(emp_row['
+            # Edit Employee
+            st.subheader("✏️ Edit Employee")
+            edit_id = st.text_input("Enter Employee ID to Edit")
+            if edit_id:
+                employee_row = df[df['id'] == edit_id]
+                if not employee_row.empty:
+                    emp = employee_row.iloc[0]
+                    updated_name = st.text_input("Name", emp['name'])
+                    updated_email = st.text_input("Email", emp['email'])
+                    updated_role = st.text_input("Role", emp['role'])
+                    updated_dept = st.text_input("Department", emp['department'])
+                    updated_status = st.selectbox("Status", ["active", "inactive"], index=["active", "inactive"].index(emp['status']))
+                    updated_doj = st.date_input("Date of Joining", datetime.fromisoformat(emp['doj']))
+                    if st.button("Update Employee"):
+                        update_employee(edit_id, (updated_name, updated_email, updated_role, updated_dept, updated_status, updated_doj.isoformat()))
+                        st.success(f"Updated employee ID {edit_id}")
+                else:
+                    st.warning("Employee ID not found.")
