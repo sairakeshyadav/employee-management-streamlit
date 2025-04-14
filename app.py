@@ -9,10 +9,15 @@ DEFAULT_ADMIN_PASSWORD = "admin123"
 DEFAULT_ADMIN_ROLE = "admin"
 
 # --- DATA SETUP ---
+# Ensure that employees.csv file has the required columns
 if not os.path.exists("employees.csv"):
     pd.DataFrame(columns=["ID", "Name", "Department", "Join Date", "Role"]).to_csv("employees.csv", index=False)
+
+# Ensure attendance.csv file exists
 if not os.path.exists("attendance.csv"):
     pd.DataFrame(columns=["ID", "Name", "Date", "Status"]).to_csv("attendance.csv", index=False)
+
+# Ensure leaves.csv file exists
 if not os.path.exists("leaves.csv"):
     pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
 
@@ -76,6 +81,11 @@ else:
     elif choice == "Employees":
         st.title("🧾 Employee Directory")
         emp_df = pd.read_csv("employees.csv")
+
+        # Ensure "Department" column exists
+        if "Department" not in emp_df.columns:
+            emp_df["Department"] = "Unassigned"  # Add default column if missing
+        
         department_filter = st.selectbox("Filter by Department", ["All"] + emp_df["Department"].unique().tolist())
         if department_filter != "All":
             filtered = emp_df[emp_df["Department"] == department_filter]
