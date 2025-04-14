@@ -3,40 +3,6 @@ import pandas as pd
 from datetime import date
 import os
 
-# --- AUTH SETUP USING FILE ---
-def load_users():
-    if not os.path.exists("users.txt"):
-        with open("users.txt", "w") as f:
-            f.write("admin,admin123,admin\n")
-    users = {}
-    with open("users.txt", "r") as f:
-        for line in f:
-            parts = line.strip().split(",")
-            if len(parts) == 3:
-                username, password, role = parts
-                users[username] = {"password": password, "role": role}
-            else:
-                st.warning(f"Ignoring invalid user line: {line.strip()}")
-    return users
-
-def login(users):
-    st.markdown("""
-        <style>
-        .block-container { display: flex; justify-content: center; align-items: center; height: 90vh; }
-        </style>
-    """, unsafe_allow_html=True)
-    st.title("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        if username in users and users[username]["password"] == password:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-            st.session_state["name"] = username.capitalize()
-            st.session_state["role"] = users[username]["role"]
-        else:
-            st.error("Invalid credentials")
-
 # --- EMPLOYEE DATA MANAGEMENT ---
 EMPLOYEE_FILE = "employees.csv"
 
@@ -54,8 +20,28 @@ def load_employee_data():
 def save_employee_data(df):
     df.to_csv(EMPLOYEE_FILE, index=False)
 
-# Load users and manage login state
-users = load_users()
+# --- LOGIN UI ---
+def login():
+    st.markdown("""
+        <style>
+        .block-container { display: flex; justify-content: center; align-items: center; height: 90vh; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("Login")
+    
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        if username == "admin" and password == "admin123":
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = username
+            st.session_state["role"] = "admin"
+            st.session_state["name"] = "Admin"
+            st.success(f"Welcome {username}!")
+        else:
+            st.error("Invalid credentials")
 
 # --- SESSION MANAGEMENT ---
 if "logged_in" not in st.session_state:
@@ -64,9 +50,11 @@ if "logged_in" not in st.session_state:
     st.session_state["name"] = ""
     st.session_state["role"] = ""
 
+# If not logged in, show login screen
 if not st.session_state["logged_in"]:
-    login(users)
+    login()
 else:
+    # Logged in, proceed to main content
     username = st.session_state["username"]
     name = st.session_state["name"]
     role = st.session_state["role"]
@@ -170,17 +158,3 @@ else:
                 st.success(f"Updated employee ID {edit_id}")
         elif edit_id:
             st.warning("Employee ID not found.")
-
-        st.subheader("\U0001F464 User Role Management")
-        st.markdown("_Manage login credentials and roles stored in users.txt_")
-        user_data = load_users()
-        st.write(pd.DataFrame([{"username": u, "role": r["role"]} for u, r in user_data.items()]))
-
-        new_user = st.text_input("New Username")
-        new_pass = st.text_input("New Password", type="password")
-        new_user_role = st.selectbox("Role", ["admin", "employee"])
-        if st.button("Add User"):
-            with open("users.txt", "a") as f:
-                f.write(f"{new_user},{new_pass},{new_user_role}\n")
-            st.success(f"User {new_user} added successfully!")
-
