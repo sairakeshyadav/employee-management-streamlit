@@ -29,18 +29,26 @@ if not os.path.exists("attendance.csv"):
 # --- LOGIN ---
 def login(users):
     st.title("👥 Employee Manager Login")
+    if "login_failed" not in st.session_state:
+        st.session_state.login_failed = False
+
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
-    if submitted:
-        if username in users and users[username]["password"] == password:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-            st.session_state["role"] = users[username]["role"]
-            st.experimental_rerun()
-        else:
-            st.error("Invalid credentials")
+        if submitted:
+            if username in users and users[username]["password"] == password:
+                st.session_state["logged_in"] = True
+                st.session_state["username"] = username
+                st.session_state["role"] = users[username]["role"]
+                st.session_state.login_failed = False
+                st.success("Login successful. Please reload the page.")
+                st.stop()
+            else:
+                st.session_state.login_failed = True
+
+    if st.session_state.login_failed:
+        st.error("Invalid credentials")
 
 # --- MAIN APP ---
 users = load_users()
@@ -59,7 +67,7 @@ else:
         for key in ["logged_in", "username", "role"]:
             if key in st.session_state:
                 del st.session_state[key]
-        st.stop()  # Stop execution to trigger a clean rerun
+        st.stop()
 
     if choice == "Dashboard":
         st.title("📊 Employee Analytics Dashboard")
