@@ -1,18 +1,38 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
 import os
+from datetime import date
+
+# --- USER MANAGEMENT (No Auth Setup Using File) ---
+def load_users():
+    users = {}
+    
+    # If the file doesn't exist or is empty, create it with a default admin user
+    if not os.path.exists("users.txt") or os.stat("users.txt").st_size == 0:
+        default_user = "admin,admin123,admin"
+        with open("users.txt", "w") as f:
+            f.write(default_user + "\n")  # Ensure there's no extra newline or spaces
+    
+    # Read users from the file
+    with open("users.txt", "r") as f:
+        for line in f:
+            # Strip any leading/trailing whitespace characters
+            parts = line.strip().split(",")
+            if len(parts) == 3:
+                username, password, role = parts
+                users[username] = {"password": password, "role": role}
+            else:
+                st.warning(f"Ignoring invalid user line: {line.strip()}")
+    
+    return users
 
 # --- DATA SETUP ---
-# Create the files if they do not exist
 if not os.path.exists("employees.csv"):
     pd.DataFrame(columns=["ID", "Name", "Department", "Join Date", "Role"]).to_csv("employees.csv", index=False)
 if not os.path.exists("attendance.csv"):
     pd.DataFrame(columns=["ID", "Name", "Date", "Status"]).to_csv("attendance.csv", index=False)
-if not os.path.exists("leaves.csv"):
-    pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
 
-# --- LOGIN FUNCTION ---
+# --- LOGIN ---
 def login(users):
     st.title("👥 Employee Manager Login")
     if "login_failed" not in st.session_state:
@@ -22,7 +42,11 @@ def login(users):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
+        
+        # Debugging: Print to see what username and password are entered
         if submitted:
+            print(f"Attempting login for: {username}, Password: {password}")
+            
             if username in users and users[username]["password"] == password:
                 st.session_state["logged_in"] = True
                 st.session_state["username"] = username
@@ -36,34 +60,14 @@ def login(users):
     if st.session_state.login_failed:
         st.error("Invalid credentials")
 
-# --- USER LOADING ---
-def load_users():
-    users = {}
-    if not os.path.exists("users.txt") or os.stat("users.txt").st_size == 0:
-        # Default admin user if file doesn't exist
-        default_user = "admin,admin123,admin"
-        with open("users.txt", "w") as f:
-            f.write(default_user + "\n")
-    
-    with open("users.txt", "r") as f:
-        for line in f:
-            parts = line.strip().split(",")
-            if len(parts) == 3:
-                username, password, role = parts
-                users[username] = {"password": password, "role": role}
-            else:
-                st.warning(f"Ignoring invalid user line: {line.strip()}")
-    
-    return users
-
 # --- MAIN APP ---
 users = load_users()
 if "logged_in" not in st.session_state:
-    login(users)  # If not logged in, show the login form
+    login(users)
 else:
     st.sidebar.title("Navigation")
     tabs = ["Dashboard", "Attendance", "Employees", "Leave Management"]
-    if st.session_state["role"] == "admin" or st.session_state["role"] == "manager":
+    if st.session_state["role"] in ["admin", "manager"]:
         tabs.append("Admin Panel")
 
     choice = st.sidebar.radio("Go to", tabs)
@@ -75,25 +79,18 @@ else:
                 del st.session_state[key]
         st.experimental_rerun()
 
-    # --- DASHBOARD (For Admin & Manager) ---
     if choice == "Dashboard" and st.session_state["role"] in ["admin", "manager"]:
         st.title("📊 Employee Analytics Dashboard")
         emp_df = pd.read_csv("employees.csv")
         att_df = pd.read_csv("attendance.csv")
         st.metric("Total Employees", len(emp_df))
         st.metric("Attendance Records", len(att_df))
-
-        # Display employee data summary
-        st.subheader("Employee Summary")
         st.dataframe(emp_df.describe(include='all'))
 
-    # --- ATTENDANCE (For Admin & Manager) ---
     elif choice == "Attendance" and st.session_state["role"] in ["admin", "manager"]:
         st.title("🔕️ Attendance Tracking")
         att_df = pd.read_csv("attendance.csv")
         st.dataframe(att_df)
-
-        # Export attendance data
         st.subheader("📄 Export Attendance Data")
         if not att_df.empty:
             csv_attendance = att_df.to_csv(index=False).encode("utf-8")
@@ -101,7 +98,6 @@ else:
         else:
             st.info("No attendance data available to export.")
 
-    # --- EMPLOYEES (For Admin & Manager) ---
     elif choice == "Employees" and st.session_state["role"] in ["admin", "manager"]:
         st.title("🧾 Employee Directory")
         emp_df = pd.read_csv("employees.csv")
@@ -112,20 +108,18 @@ else:
             else:
                 filtered = emp_df
             st.dataframe(filtered)
-
-            # Export employee data
             st.subheader("📄 Export Employee Data")
             csv_employees = filtered.to_csv(index=False).encode("utf-8")
             st.download_button("Download Employee CSV", csv_employees, "employee_export.csv", "text/csv")
         else:
-            st.info("No employee data available.")
+            st.info("No employee data to export.")
 
-    # --- LEAVE MANAGEMENT (For All Roles) ---
     elif choice == "Leave Management":
         st.title("📝 Leave Management")
+        if not os.path.exists("leaves.csv"):
+            pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
         leave_df = pd.read_csv("leaves.csv")
 
-        # Apply for leave
         st.subheader("Apply for Leave")
         with st.form("leave_form"):
             from_date = st.date_input("From Date")
@@ -139,22 +133,19 @@ else:
                 leave_df.to_csv("leaves.csv", index=False)
                 st.success("Leave request submitted.")
 
-        # Display leave history
         st.subheader("Leave History")
         st.dataframe(leave_df[leave_df["Username"] == st.session_state["username"]])
 
-    # --- ADMIN PANEL (For Admin Only) ---
-    elif choice == "Admin Panel" and st.session_state["role"] == "admin":
+    elif choice == "Admin Panel" and st.session_state["role"] in ["admin"]:
         st.title("⚙️ Admin Panel")
 
-        # Add New Employee
         st.subheader("Add New Employee")
         with st.form("add_emp"):
             emp_id = st.text_input("Employee ID")
             name = st.text_input("Name")
             dept = st.text_input("Department")
             join = st.date_input("Join Date", date.today())
-            role = st.selectbox("Role", ["employee", "admin", "manager"])
+            role = st.selectbox("Role", ["employee", "admin"])
             submitted = st.form_submit_button("Add Employee")
             if submitted:
                 new_emp = pd.DataFrame([[emp_id, name, dept, join, role]],
@@ -164,12 +155,11 @@ else:
                 emp_df.to_csv("employees.csv", index=False)
                 st.success("Employee added!")
 
-        # Add New User
         st.subheader("Add New User")
         with st.form("add_user"):
             new_user = st.text_input("Username")
             new_pass = st.text_input("Password", type="password")
-            new_role = st.selectbox("Role", ["employee", "admin", "manager"])
+            new_role = st.selectbox("Role", ["employee", "manager", "admin"])
             add_user_btn = st.form_submit_button("Add User")
             if add_user_btn:
                 with open("users.txt", "a") as f:
@@ -177,8 +167,8 @@ else:
                 st.success("User added!")
                 users = load_users()  # Reload users after adding new one
 
-        # Review Leave Requests
         st.subheader("Review Leave Requests")
+        leave_df = pd.read_csv("leaves.csv")
         for idx, row in leave_df[leave_df["Status"] == "Pending"].iterrows():
             st.write(f"User: {row['Username']} | From: {row['From']} | To: {row['To']} | Reason: {row['Reason']}")
             col1, col2 = st.columns(2)
