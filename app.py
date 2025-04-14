@@ -11,8 +11,28 @@ if not os.path.exists("attendance.csv"):
 if not os.path.exists("leaves.csv"):
     pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
 
+# --- LOAD USERS FROM FILE ---
+def load_users():
+    users = {}
+    if os.path.exists("users.txt"):
+        with open("users.txt", "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) == 3:
+                    username, password, role = parts
+                    users[username] = {"password": password, "role": role}
+                else:
+                    st.warning(f"Ignoring invalid user line: {line.strip()}")
+    else:
+        # Default admin credentials if the file doesn't exist
+        default_user = "admin,admin123,admin"
+        with open("users.txt", "w") as f:
+            f.write(default_user + "\n")
+        users["admin"] = {"password": "admin123", "role": "admin"}
+    return users
+
 # --- LOGIN SETUP ---
-def login():
+def login(users):
     st.title("👥 Employee Manager Login")
     if "login_failed" not in st.session_state:
         st.session_state.login_failed = False
@@ -22,17 +42,10 @@ def login():
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
         if submitted:
-            if username == "admin" and password == "admin123":
+            if username in users and users[username]["password"] == password:
                 st.session_state["logged_in"] = True
-                st.session_state["username"] = "admin"
-                st.session_state["role"] = "admin"
-                st.session_state.login_failed = False
-                st.success("Login successful!")
-                st.stop()
-            elif username == "manager" and password == "manager123":
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = "manager"
-                st.session_state["role"] = "manager"
+                st.session_state["username"] = username
+                st.session_state["role"] = users[username]["role"]
                 st.session_state.login_failed = False
                 st.success("Login successful!")
                 st.stop()
@@ -43,8 +56,9 @@ def login():
         st.error("Invalid credentials")
 
 # --- MAIN APP ---
+users = load_users()
 if "logged_in" not in st.session_state:
-    login()
+    login(users)
 else:
     st.sidebar.title("Navigation")
     tabs = ["Dashboard", "Attendance", "Employees", "Leave Management"]
