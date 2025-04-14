@@ -143,6 +143,7 @@ else:
     elif choice == "Admin Panel" and st.session_state["role"] == "admin":
         st.title("⚙️ Admin Panel")
 
+        # Add Employee Form
         st.subheader("Add New Employee")
         with st.form("add_emp"):
             emp_id = st.text_input("Employee ID")
@@ -159,6 +160,7 @@ else:
                 emp_df.to_csv("employees.csv", index=False)
                 st.success("Employee added!")
 
+        # Add User Form
         st.subheader("Add New User")
         with st.form("add_user"):
             new_user = st.text_input("Username")
@@ -166,12 +168,12 @@ else:
             new_role = st.selectbox("Role", ["employee", "admin", "manager"])
             add_user_btn = st.form_submit_button("Add User")
             if add_user_btn:
-                # Store new user in the users.txt file
                 with open("users.txt", "a") as f:
                     f.write(f"{new_user},{new_pass},{new_role}\n")
                 st.success("User added!")
                 users = load_users()  # Reload users after adding new one
 
+        # Review Leave Requests
         st.subheader("Review Leave Requests")
         leave_df = pd.read_csv("leaves.csv")
         for idx, row in leave_df[leave_df["Status"] == "Pending"].iterrows():
@@ -189,11 +191,8 @@ else:
     elif choice == "Manager Panel" and st.session_state["role"] == "manager":
         st.title("⚙️ Manager Panel")
 
+        # Review Leave Requests
         st.subheader("Review Leave Requests")
         leave_df = pd.read_csv("leaves.csv")
         for idx, row in leave_df[leave_df["Status"] == "Pending"].iterrows():
-            st.write(f"User: {row['Username']} | From: {row['From']} | To: {row['To']} | Reason: {row['Reason']}")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"Approve {idx}"):
-                    leave_df.at[idx, "Status"]
+            st.write(f"User: {row['Username']} | From: {row['From']} | To: {
