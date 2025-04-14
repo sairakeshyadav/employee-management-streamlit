@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-import bcrypt
 from datetime import date
 
 # --- Initialize Session State ---
@@ -40,20 +39,6 @@ def execute_query(query, params=()):
         st.error(f"Database operation failed: {e}")
 
 # --- HELPER FUNCTIONS ---
-def hash_password(password):
-    """Hash a password using bcrypt."""
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
-def verify_password(password, hashed_password):
-    """Verify a password against its hash using bcrypt."""
-    try:
-        # Convert hashed_password to bytes if it's stored as a string
-        hashed_password = hashed_password.encode('utf-8') if isinstance(hashed_password, str) else hashed_password
-        return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
-    except ValueError as e:
-        st.error(f"Password verification failed: {e}")
-        return False
-
 def validate_input(username, password):
     """Validate input for username and password."""
     if len(username) < 3:
@@ -66,13 +51,10 @@ def validate_input(username, password):
 
 # --- Create Default Admin User ---
 def create_default_admin():
-    """Ensure a default admin user is created with a secure password."""
+    """Ensure a default admin user is created."""
     default_admin_username = "admin"
-    default_admin_password = "admin123"  # Update this to a stronger default password
+    default_admin_password = "admin123"  # Default password (stored in plain text)
     default_admin_role = "admin"
-
-    # Hash the default admin password
-    hashed_password = hash_password(default_admin_password)
 
     try:
         # Check if the admin user already exists
@@ -82,7 +64,7 @@ def create_default_admin():
             # Insert the default admin user into the database
             execute_query(
                 "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                (default_admin_username, hashed_password, default_admin_role),
+                (default_admin_username, default_admin_password, default_admin_role),
             )
             st.info("Default admin user created. Username: 'admin', Password: 'admin123'")
         else:
@@ -106,8 +88,8 @@ def login():
             user_df = load_data(query, (username,))
             if not user_df.empty:
                 user = user_df.iloc[0]
-                hashed_password = user["password"].encode("utf-8") if isinstance(user["password"], str) else user["password"]
-                if verify_password(password, hashed_password):
+                stored_password = user["password"]
+                if password == stored_password:
                     st.session_state["logged_in"] = True
                     st.session_state["username"] = user["username"]
                     st.session_state["role"] = user["role"]
@@ -168,10 +150,9 @@ else:
             if st.button("Add User"):
                 if validate_input(new_username, new_password):
                     try:
-                        hashed_password = hash_password(new_password)
                         execute_query(
                             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                            (new_username, hashed_password, new_role),
+                            (new_username, new_password, new_role),
                         )
                         st.success(f"User '{new_username}' added successfully!")
                     except Exception as e:
@@ -186,10 +167,9 @@ else:
             if st.button("Reset Password"):
                 if validate_input(reset_username, reset_new_password):
                     try:
-                        hashed_password = hash_password(reset_new_password)
                         execute_query(
                             "UPDATE users SET password = ? WHERE username = ?",
-                            (hashed_password, reset_username),
+                            (reset_new_password, reset_username),
                         )
                         st.success(f"Password for '{reset_username}' has been reset.")
                     except Exception as e:
