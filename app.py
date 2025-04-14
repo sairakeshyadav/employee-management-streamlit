@@ -3,15 +3,16 @@ import pandas as pd
 import sqlite3
 from datetime import date, datetime
 import uuid
-import os
 
-# --- DATABASE MANAGEMENT ---
+# --- DATABASE SETTINGS ---
 DB_FILE = "employee_management.db"
 
+# --- INITIALIZE DATABASE ---
 def initialize_database():
+    """Initialize the database and create necessary tables."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    # Create employees table
+    # Employees table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS employees (
             id TEXT PRIMARY KEY,
@@ -23,7 +24,7 @@ def initialize_database():
             doj TEXT NOT NULL
         )
     """)
-    # Create attendance table
+    # Attendance table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,7 +34,7 @@ def initialize_database():
             FOREIGN KEY (employee_id) REFERENCES employees (id)
         )
     """)
-    # Create users table
+    # Users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -43,75 +44,140 @@ def initialize_database():
     conn.commit()
     conn.close()
 
+
+# --- DATABASE CONNECTION ---
 def get_connection():
+    """Get a connection to the database."""
     return sqlite3.connect(DB_FILE)
 
-# --- DATA OPERATIONS ---
-# Load user data
+
+# --- DATABASE OPERATIONS ---
+def load_employee_data():
+    """Load employee data from the database."""
+    try:
+        conn = get_connection()
+        df = pd.read_sql_query("SELECT * FROM employees", conn)
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Error loading employee data: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame
+
+
+def save_employee(employee):
+    """Save a new employee to the database."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO employees (id, name, email, role, department, status, doj)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, employee)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error saving employee: {e}")
+
+
+def update_employee(employee_id, updated_data):
+    """Update an employee's information in the database."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE employees
+            SET name = ?, email = ?, role = ?, department = ?, status = ?, doj = ?
+            WHERE id = ?
+        """, (*updated_data, employee_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error updating employee: {e}")
+
+
+def delete_employee(employee_id):
+    """Delete an employee from the database."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM employees WHERE id = ?", (employee_id,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error deleting employee: {e}")
+
+
 def load_users():
-    conn = get_connection()
-    df = pd.read_sql_query("SELECT * FROM users", conn)
-    conn.close()
-    return df
+    """Load user data from the database."""
+    try:
+        conn = get_connection()
+        df = pd.read_sql_query("SELECT * FROM users", conn)
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Error loading users: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame
 
-# Add a new user
+
 def add_user(username, password):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO users (username, password)
-        VALUES (?, ?)
-    """, (username, password))
-    conn.commit()
-    conn.close()
+    """Add a new user to the database."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO users (username, password)
+            VALUES (?, ?)
+        """, (username, password))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error adding user: {e}")
 
-# Update a user's password
+
 def reset_password(username, new_password):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE users
-        SET password = ?
-        WHERE username = ?
-    """, (new_password, username))
-    conn.commit()
-    conn.close()
+    """Reset a user's password."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users
+            SET password = ?
+            WHERE username = ?
+        """, (new_password, username))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error resetting password: {e}")
 
-# Delete a user
+
 def delete_user(username):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        DELETE FROM users
-        WHERE username = ?
-    """, (username,))
-    conn.commit()
-    conn.close()
+    """Delete a user from the database."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error deleting user: {e}")
+
 
 # --- STREAMLIT APP ---
-# Initialize database
+# Initialize the database
 initialize_database()
 
-# --- SESSION MANAGEMENT ---
+# Session state for login
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
-    st.session_state["name"] = ""
     st.session_state["role"] = ""
 
-# --- LOGIN UI ---
+
 def login():
-    st.markdown("""
-        <style>
-        .block-container { display: flex; justify-content: center; align-items: center; height: 90vh; }
-        </style>
-    """, unsafe_allow_html=True)
-    
+    """User login interface."""
     st.title("Login")
-    
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
-    
     if st.button("Login"):
         conn = get_connection()
         cursor = conn.cursor()
@@ -121,98 +187,54 @@ def login():
         if user:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
-            st.session_state["role"] = "admin"  # Assuming all users are admins for this example
-            st.session_state["name"] = username.capitalize()
+            st.session_state["role"] = "admin"  # Assuming all users are admins
             st.success(f"Welcome {username}!")
         else:
             st.error("Invalid credentials")
 
-# --- MAIN APP ---
+
 if not st.session_state["logged_in"]:
     login()
 else:
-    # Top right logout button
     st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
-    st.sidebar.success(f"Welcome, {st.session_state['name']} \U0001F44B")
+    st.sidebar.success(f"Welcome, {st.session_state['username']}")
 
-    # --- MAIN TABS ---
-    tabs = st.tabs(["\U0001F4CA Dashboard", "\U0001F4C5 Attendance", "\U0001F4DD Leaves", "\U0001F465 Employees", "\U0001F511 Admin Management"])
+    tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
 
-    # --- DASHBOARD ---
     with tabs[0]:
-        st.title("\U0001F4CA Dashboard Overview")
+        st.title("Dashboard")
         df = load_employee_data()
+        st.write(df)
 
-        # Employee Overview
-        total_employees = len(df)
-        active_employees = len(df[df['status'] == 'active'])
-        inactive_employees = len(df[df['status'] == 'inactive'])
-        st.metric("Total Employees", total_employees)
-        st.metric("Active Employees", active_employees)
-        st.metric("Inactive Employees", inactive_employees)
-
-    # --- ATTENDANCE ---
     with tabs[1]:
-        st.title("\U0001F4C5 Mark Attendance")
-        df = load_employee_data()
-        today = date.today().isoformat()
-        if not df.empty:
-            for _, emp in df.iterrows():
-                status = st.selectbox(f"{emp['name']} - {today}", ["present", "absent"], key=f"attendance_{emp['id']}")
-                if st.button(f"Mark {emp['name']}", key=f"mark_{emp['id']}"):
-                    save_attendance((emp['id'], today, status))
-                    st.success(f"{emp['name']} marked as {status}")
-        else:
-            st.info("No employees to mark attendance for.")
+        st.title("Employees")
+        # Add employee management logic here
 
-    # --- LEAVES ---
     with tabs[2]:
-        st.title("\U0001F4DD Apply for Leave")
-        df = load_employee_data()
-        if not df.empty:
-            emp_name = st.selectbox("Select Employee", df['name'])
-            reason = st.text_input("Reason for Leave")
-            if st.button("Apply for Leave"):
-                st.success(f"{emp_name} applied for leave: {reason}")
-        else:
-            st.info("No employees available.")
+        st.title("Attendance")
+        # Add attendance logic here
 
-    # --- EMPLOYEES ---
     with tabs[3]:
-        st.title("\U0001F465 Employee Directory")
-        df = load_employee_data()
-        search = st.text_input("Search by name")
-        filtered = df[df['name'].str.contains(search, case=False, na=False)] if search else df
-        st.dataframe(filtered)
-
-    # --- ADMIN MANAGEMENT ---
-    with tabs[4]:
-        st.title("\U0001F511 Admin Management")
-
-        # Add User
-        st.subheader("➕ Add New User")
+        st.title("Admin Management")
+        st.subheader("Add New User")
         new_username = st.text_input("Username")
         new_password = st.text_input("Password", type="password")
         if st.button("Add User"):
             add_user(new_username, new_password)
             st.success(f"User '{new_username}' added successfully!")
 
-        # Reset Password
-        st.subheader("🔄 Reset Password")
-        reset_username = st.text_input("Username to Reset", key="reset_username")
-        new_password = st.text_input("New Password", type="password", key="reset_password")
+        st.subheader("Reset Password")
+        reset_user = st.text_input("Username to Reset Password", key="reset_user")
+        reset_pass = st.text_input("New Password", type="password", key="reset_pass")
         if st.button("Reset Password"):
-            reset_password(reset_username, new_password)
-            st.success(f"Password for user '{reset_username}' has been reset!")
+            reset_password(reset_user, reset_pass)
+            st.success(f"Password for user '{reset_user}' has been reset!")
 
-        # Delete User
-        st.subheader("❌ Delete User")
-        del_username = st.text_input("Username to Delete", key="delete_username")
+        st.subheader("Delete User")
+        del_user = st.text_input("Username to Delete", key="del_user")
         if st.button("Delete User"):
-            delete_user(del_username)
-            st.success(f"User '{del_username}' has been deleted!")
+            delete_user(del_user)
+            st.success(f"User '{del_user}' has been deleted!")
 
-        # List of Users
-        st.subheader("👥 Existing Users")
-        users_df = load_users()
-        st.dataframe(users_df)
+        st.subheader("Existing Users")
+        st.write(load_users())
