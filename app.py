@@ -7,12 +7,12 @@ import os
 def load_users():
     if not os.path.exists("users.txt"):
         with open("users.txt", "w") as f:
-            f.write("admin,adminpass\n")
+            f.write("admin,adminpass,admin\n")
     users = {}
     with open("users.txt", "r") as f:
         for line in f:
-            username, password = line.strip().split(",")
-            users[username] = password
+            username, password, role = line.strip().split(",")
+            users[username] = {"password": password, "role": role}
     return users
 
 def login(users):
@@ -25,10 +25,11 @@ def login(users):
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     if st.button("Login"):
-        if username in users and users[username] == password:
+        if username in users and users[username]["password"] == password:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["name"] = username.capitalize()
+            st.session_state["role"] = users[username]["role"]
         else:
             st.error("Invalid credentials")
 
@@ -56,12 +57,14 @@ if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
     st.session_state["name"] = ""
+    st.session_state["role"] = ""
 
 if not st.session_state["logged_in"]:
     login(users)
 else:
     username = st.session_state["username"]
     name = st.session_state["name"]
+    role = st.session_state["role"]
 
     # Top right logout button
     st.markdown("""
@@ -71,8 +74,7 @@ else:
     """, unsafe_allow_html=True)
     st.markdown('<div class="logout-button">', unsafe_allow_html=True)
     if st.button("Logout"):
-        st.session_state["logged_in"] = False
-        st.experimental_rerun()
+        st.session_state.clear()
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.sidebar.success(f"Welcome, {name} \U0001F44B")
@@ -119,7 +121,7 @@ else:
         st.dataframe(filtered)
 
     # --- ADMIN PANEL ---
-    if username == "admin":
+    if role == "admin":
         st.markdown("---")
         st.header("\U0001F6E0\ufe0f Admin Panel – Manage Employees")
 
@@ -146,3 +148,33 @@ else:
             df = df[df['id'] != del_id]
             save_employee_data(df)
             st.success(f"Deleted employee ID {del_id}")
+
+        st.subheader("\u270F\ufe0f Edit Employee")
+        edit_id = st.text_input("Enter Employee ID to Edit")
+        if edit_id in df['id'].values:
+            emp_row = df[df['id'] == edit_id].iloc[0]
+            new_name = st.text_input("New Name", emp_row['name'])
+            new_email = st.text_input("New Email", emp_row['email'])
+            new_role = st.text_input("New Role", emp_row['role'])
+            new_dept = st.text_input("New Department", emp_row['department'])
+            new_status = st.selectbox("New Status", ["active", "inactive"], index=["active", "inactive"].index(emp_row['status']))
+            new_doj = st.date_input("New Date of Joining", pd.to_datetime(emp_row['doj']))
+            if st.button("Update Employee"):
+                df.loc[df['id'] == edit_id, ['name', 'email', 'role', 'department', 'status', 'doj']] = [new_name, new_email, new_role, new_dept, new_status, str(new_doj)]
+                save_employee_data(df)
+                st.success(f"Updated employee ID {edit_id}")
+        elif edit_id:
+            st.warning("Employee ID not found.")
+
+        st.subheader("\U0001F464 User Role Management")
+        st.markdown("_Manage login credentials and roles stored in users.txt_")
+        user_data = load_users()
+        st.write(pd.DataFrame([{"username": u, "role": r["role"]} for u, r in user_data.items()]))
+
+        new_user = st.text_input("New Username")
+        new_pass = st.text_input("New Password", type="password")
+        new_user_role = st.selectbox("Role", ["admin", "employee"])
+        if st.button("Add User"):
+            with open("users.txt", "a") as f:
+                f.write(f"{new_user},{new_pass},{new_user_role}\n")
+            st.success(f"User {new_user} added successfully!")
