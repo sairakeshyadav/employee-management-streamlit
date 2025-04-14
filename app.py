@@ -141,6 +141,7 @@ else:
     else:
         tabs = st.tabs(["Dashboard", "Employees", "Attendance"])
 
+    # Role-based Tabs
     with tabs[0]:
         st.title("Dashboard")
         df = load_data("SELECT * FROM employees")
