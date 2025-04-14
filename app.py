@@ -17,7 +17,7 @@ def login():
             user_df = load_data(query, (username,))
             if not user_df.empty:
                 user = user_df.iloc[0]
-                # Convert the hashed password to bytes
+                # Convert the hashed password to bytes if it's stored as a string
                 hashed_password = user["password"].encode('utf-8') if isinstance(user["password"], str) else user["password"]
                 if verify_password(password, hashed_password):
                     st.session_state["logged_in"] = True
