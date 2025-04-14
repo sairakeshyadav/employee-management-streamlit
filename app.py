@@ -11,8 +11,12 @@ def load_users():
     users = {}
     with open("users.txt", "r") as f:
         for line in f:
-            username, password, role = line.strip().split(",")
-            users[username] = {"password": password, "role": role}
+            parts = line.strip().split(",")
+            if len(parts) == 3:
+                username, password, role = parts
+                users[username] = {"password": password, "role": role}
+            else:
+                st.warning(f"Ignoring invalid user line: {line.strip()}")
     return users
 
 def login(users):
@@ -123,12 +127,12 @@ else:
     # --- ADMIN PANEL ---
     if role == "admin":
         st.markdown("---")
-        st.header("\U0001F6E0\ufe0f Admin Panel – Manage Employees")
+        st.header("\U0001F6E0️ Admin Panel – Manage Employees")
 
         st.subheader("\U0001F4CB Current Employees")
         st.dataframe(df)
 
-        st.subheader("\u2795 Add New Employee")
+        st.subheader("➕ Add New Employee")
         new_name = st.text_input("Name")
         new_email = st.text_input("Email")
         new_role = st.text_input("Role")
@@ -142,14 +146,14 @@ else:
             save_employee_data(df)
             st.success(f"Added {new_name} to the employee list!")
 
-        st.subheader("\u274C Delete Employee by ID")
+        st.subheader("❌ Delete Employee by ID")
         del_id = st.text_input("Enter Employee ID to Delete")
         if st.button("Delete"):
             df = df[df['id'] != del_id]
             save_employee_data(df)
             st.success(f"Deleted employee ID {del_id}")
 
-        st.subheader("\u270F\ufe0f Edit Employee")
+        st.subheader("✏️ Edit Employee")
         edit_id = st.text_input("Enter Employee ID to Edit")
         if edit_id in df['id'].values:
             emp_row = df[df['id'] == edit_id].iloc[0]
