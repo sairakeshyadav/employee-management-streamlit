@@ -45,7 +45,8 @@ def initialize_database():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            role TEXT NOT NULL
         )
     """)
     
@@ -53,9 +54,9 @@ def initialize_database():
     cursor.execute("SELECT * FROM users WHERE username = ?", (DEFAULT_ADMIN_USERNAME,))
     if cursor.fetchone() is None:
         cursor.execute("""
-            INSERT INTO users (username, password)
-            VALUES (?, ?)
-        """, (DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD))
+            INSERT INTO users (username, password, role)
+            VALUES (?, ?, ?)
+        """, (DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, "admin"))
         st.info("Default admin credentials added: Username='admin', Password='admin123'")
     
     conn.commit()
@@ -129,15 +130,15 @@ def load_users():
         st.error(f"Error loading users: {e}")
         return pd.DataFrame()
 
-def add_user(username, password):
+def add_user(username, password, role):
     """Add a new user to the database."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO users (username, password)
-            VALUES (?, ?)
-        """, (username, password))
+            INSERT INTO users (username, password, role)
+            VALUES (?, ?, ?)
+        """, (username, password, role))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -193,7 +194,7 @@ def login():
         if user:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
-            st.session_state["role"] = "admin"  # Assuming all users are admins
+            st.session_state["role"] = user[2]  # Role is the 3rd column in the users table
             st.success(f"Welcome {username}!")
         else:
             st.error("Invalid credentials")
@@ -204,7 +205,11 @@ else:
     st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
     st.sidebar.success(f"Welcome, {st.session_state['username']}")
 
-    tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
+    # Tabs for the app
+    if st.session_state["role"] == "admin":
+        tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
+    else:
+        tabs = st.tabs(["Dashboard", "Employees", "Attendance"])
 
     with tabs[0]:
         st.title("Dashboard")
@@ -219,27 +224,29 @@ else:
         st.title("Attendance")
         # Add attendance logic here
 
-    with tabs[3]:
-        st.title("Admin Management")
-        st.subheader("Add New User")
-        new_username = st.text_input("Username")
-        new_password = st.text_input("Password", type="password")
-        if st.button("Add User"):
-            add_user(new_username, new_password)
-            st.success(f"User '{new_username}' added successfully!")
+    if st.session_state["role"] == "admin":
+        with tabs[3]:
+            st.title("Admin Management")
+            st.subheader("Add New User")
+            new_username = st.text_input("Username")
+            new_password = st.text_input("Password", type="password")
+            new_role = st.selectbox("Role", ["admin", "user"])
+            if st.button("Add User"):
+                add_user(new_username, new_password, new_role)
+                st.success(f"User '{new_username}' added successfully!")
 
-        st.subheader("Reset Password")
-        reset_user = st.text_input("Username to Reset Password", key="reset_user")
-        reset_pass = st.text_input("New Password", type="password", key="reset_pass")
-        if st.button("Reset Password"):
-            reset_password(reset_user, reset_pass)
-            st.success(f"Password for user '{reset_user}' has been reset!")
+            st.subheader("Reset Password")
+            reset_user = st.text_input("Username to Reset Password", key="reset_user")
+            reset_pass = st.text_input("New Password", type="password", key="reset_pass")
+            if st.button("Reset Password"):
+                reset_password(reset_user, reset_pass)
+                st.success(f"Password for user '{reset_user}' has been reset!")
 
-        st.subheader("Delete User")
-        del_user = st.text_input("Username to Delete", key="del_user")
-        if st.button("Delete User"):
-            delete_user(del_user)
-            st.success(f"User '{del_user}' has been deleted!")
+            st.subheader("Delete User")
+            del_user = st.text_input("Username to Delete", key="del_user")
+            if st.button("Delete User"):
+                delete_user(del_user)
+                st.success(f"User '{del_user}' has been deleted!")
 
-        st.subheader("Existing Users")
-        st.write(load_users())
+            st.subheader("Existing Users")
+            st.write(load_users())
