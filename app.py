@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-from datetime import date, datetime
+from datetime import date
 import uuid
 
 # --- DATABASE SETTINGS ---
@@ -79,46 +79,6 @@ def load_employee_data():
         st.error(f"Error loading employee data: {e}")
         return pd.DataFrame()
 
-def save_employee(employee):
-    """Save a new employee to the database."""
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO employees (id, name, email, role, department, status, doj)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, employee)
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        st.error(f"Error saving employee: {e}")
-
-def update_employee(employee_id, updated_data):
-    """Update an employee's information in the database."""
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE employees
-            SET name = ?, email = ?, role = ?, department = ?, status = ?, doj = ?
-            WHERE id = ?
-        """, (*updated_data, employee_id))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        st.error(f"Error updating employee: {e}")
-
-def delete_employee(employee_id):
-    """Delete an employee from the database."""
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM employees WHERE id = ?", (employee_id,))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        st.error(f"Error deleting employee: {e}")
-
 def load_users():
     """Load user data from the database."""
     try:
@@ -174,7 +134,7 @@ def delete_user(username):
 # Initialize the database
 initialize_database()
 
-# Session state for login
+# Initialize session state for login
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
@@ -186,24 +146,29 @@ def login():
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     if st.button("Login"):
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
-        user = cursor.fetchone()
-        conn.close()
-        if user:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-            st.session_state["role"] = user[2]  # Role is the 3rd column in the users table
-            st.success(f"Welcome {username}!")
-        else:
-            st.error("Invalid credentials")
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+            user = cursor.fetchone()
+            conn.close()
+
+            if user:
+                st.session_state["logged_in"] = True
+                st.session_state["username"] = username
+                st.session_state["role"] = user[2]  # Role is the 3rd column in the users table
+                st.success(f"Welcome, {username}!")
+            else:
+                st.error("Invalid username or password. Please try again.")
+        except Exception as e:
+            st.error(f"An error occurred during login: {e}")
 
 if not st.session_state["logged_in"]:
     login()
 else:
+    # Sidebar for logout and user details
     st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
-    st.sidebar.success(f"Welcome, {st.session_state['username']}")
+    st.sidebar.success(f"Logged in as: {st.session_state['username']}")
 
     # Tabs for the app
     if st.session_state["role"] == "admin":
@@ -214,39 +179,51 @@ else:
     with tabs[0]:
         st.title("Dashboard")
         df = load_employee_data()
-        st.write(df)
+        if not df.empty:
+            st.dataframe(df)
+        else:
+            st.info("No employee data available.")
 
     with tabs[1]:
         st.title("Employees")
-        # Add employee management logic here
+        st.info("Employee management functionality goes here.")
 
     with tabs[2]:
         st.title("Attendance")
-        # Add attendance logic here
+        st.info("Attendance tracking functionality goes here.")
 
     if st.session_state["role"] == "admin":
         with tabs[3]:
             st.title("Admin Management")
+            
+            # Add User
             st.subheader("Add New User")
-            new_username = st.text_input("Username")
-            new_password = st.text_input("Password", type="password")
+            new_username = st.text_input("New Username")
+            new_password = st.text_input("New Password", type="password")
             new_role = st.selectbox("Role", ["admin", "user"])
             if st.button("Add User"):
                 add_user(new_username, new_password, new_role)
                 st.success(f"User '{new_username}' added successfully!")
 
+            # Reset Password
             st.subheader("Reset Password")
-            reset_user = st.text_input("Username to Reset Password", key="reset_user")
-            reset_pass = st.text_input("New Password", type="password", key="reset_pass")
+            reset_username = st.text_input("Username to Reset", key="reset_username")
+            reset_new_password = st.text_input("New Password", type="password", key="reset_new_password")
             if st.button("Reset Password"):
-                reset_password(reset_user, reset_pass)
-                st.success(f"Password for user '{reset_user}' has been reset!")
+                reset_password(reset_username, reset_new_password)
+                st.success(f"Password for '{reset_username}' has been reset.")
 
+            # Delete User
             st.subheader("Delete User")
-            del_user = st.text_input("Username to Delete", key="del_user")
+            delete_username = st.text_input("Username to Delete", key="delete_username")
             if st.button("Delete User"):
-                delete_user(del_user)
-                st.success(f"User '{del_user}' has been deleted!")
+                delete_user(delete_username)
+                st.success(f"User '{delete_username}' has been deleted.")
 
+            # Show Existing Users
             st.subheader("Existing Users")
-            st.write(load_users())
+            user_df = load_users()
+            if not user_df.empty:
+                st.dataframe(user_df)
+            else:
+                st.info("No users found.")
