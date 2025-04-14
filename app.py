@@ -32,15 +32,23 @@ def login(users):
         else:
             st.error("Invalid credentials")
 
-# --- DUMMY EMPLOYEE DATA ---
-def load_dummy_data():
-    data = [
-        {"id": "1", "name": "Alice", "email": "alice@example.com", "role": "Engineer", "department": "Tech", "status": "active", "doj": "2022-01-01"},
-        {"id": "2", "name": "Bob", "email": "bob@example.com", "role": "Designer", "department": "Design", "status": "active", "doj": "2022-03-15"},
-    ]
-    return pd.DataFrame(data)
+# --- EMPLOYEE DATA MANAGEMENT ---
+EMPLOYEE_FILE = "employees.csv"
 
-# Load users from file
+def load_employee_data():
+    if not os.path.exists(EMPLOYEE_FILE):
+        df = pd.DataFrame([
+            {"id": "1", "name": "Alice", "email": "alice@example.com", "role": "Engineer", "department": "Tech", "status": "active", "doj": "2022-01-01"},
+            {"id": "2", "name": "Bob", "email": "bob@example.com", "role": "Designer", "department": "Design", "status": "active", "doj": "2022-03-15"},
+        ])
+        df.to_csv(EMPLOYEE_FILE, index=False)
+    else:
+        df = pd.read_csv(EMPLOYEE_FILE)
+    return df
+
+def save_employee_data(df):
+    df.to_csv(EMPLOYEE_FILE, index=False)
+
 users = load_users()
 
 # --- SESSION MANAGEMENT ---
@@ -49,9 +57,8 @@ if "logged_in" not in st.session_state:
     st.session_state["username"] = ""
     st.session_state["name"] = ""
 
-# Check if the user is logged in
 if not st.session_state["logged_in"]:
-    login(users)  # Show login page if not logged in
+    login(users)
 else:
     username = st.session_state["username"]
     name = st.session_state["name"]
@@ -64,7 +71,8 @@ else:
     """, unsafe_allow_html=True)
     st.markdown('<div class="logout-button">', unsafe_allow_html=True)
     if st.button("Logout"):
-        st.session_state["logged_in"] = False  # Logout action
+        st.session_state["logged_in"] = False
+        st.experimental_rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.sidebar.success(f"Welcome, {name} \U0001F44B")
@@ -73,7 +81,7 @@ else:
     tabs = st.tabs(["\U0001F4CA Dashboard", "\U0001F4C5 Attendance", "\U0001F4DD Leaves", "\U0001F465 Employees"])
 
     # Load employee data
-    df = load_dummy_data()
+    df = load_employee_data()
 
     with tabs[0]:  # Dashboard
         st.title("\U0001F4CA Dashboard Overview")
@@ -129,10 +137,12 @@ else:
         if st.button("Add Employee"):
             new_row = pd.DataFrame([{"id": str(len(df)+1), "name": new_name, "email": new_email, "role": new_role, "department": new_dept, "status": new_status, "doj": str(new_doj)}])
             df = pd.concat([df, new_row], ignore_index=True)
+            save_employee_data(df)
             st.success(f"Added {new_name} to the employee list!")
 
         st.subheader("\u274C Delete Employee by ID")
         del_id = st.text_input("Enter Employee ID to Delete")
         if st.button("Delete"):
             df = df[df['id'] != del_id]
+            save_employee_data(df)
             st.success(f"Deleted employee ID {del_id}")
