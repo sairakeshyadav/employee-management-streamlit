@@ -22,6 +22,9 @@ def load_users():
             else:
                 st.warning(f"Ignoring invalid user line: {line.strip()}")
     
+    # Debugging: Print out the loaded users to confirm credentials
+    st.write("Loaded users from users.txt:", users)
+    
     # Clean the file by removing any invalid lines
     with open("users.txt", "r") as f:
         lines = f.readlines()
@@ -44,12 +47,14 @@ def login(users):
     st.title("Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
+    
     if st.button("Login"):
         if username in users and users[username]["password"] == password:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["name"] = username.capitalize()
             st.session_state["role"] = users[username]["role"]
+            st.success(f"Logged in as {username}")
         else:
             st.error("Invalid credentials")
 
