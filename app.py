@@ -1,16 +1,16 @@
-if not st.session_state["logged_in"]:
+if not st.session_state.get("logged_in", False):
     login()
 else:
     # Sidebar for logout and user details
     st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
-    st.sidebar.success(f"Logged in as: {st.session_state['username']}")
-
+    st.sidebar.success(f"Logged in as: {st.session_state.get('username', '')}")
+    
     # Tabs for the app
-    if st.session_state["role"] == "admin":
+    if st.session_state.get("role", "") == "admin":
         tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
     else:
         tabs = st.tabs(["Dashboard", "Employees", "Attendance"])
-
+    
     # Dashboard Tab
     with tabs[0]:
         st.title("Dashboard")
@@ -22,19 +22,19 @@ else:
                 st.info("No employee data available.")
         except Exception as e:
             st.error(f"Error loading dashboard data: {e}")
-
+    
     # Employees Tab
     with tabs[1]:
         st.title("Employees")
         st.info("Employee management functionality goes here.")
-
+    
     # Attendance Tab
     with tabs[2]:
         st.title("Attendance")
         st.info("Attendance tracking functionality goes here.")
-
+    
     # Admin Management Tab (only visible for admin users)
-    if st.session_state["role"] == "admin":
+    if st.session_state.get("role", "") == "admin":
         with tabs[3]:
             st.title("Admin Management")
             
@@ -55,7 +55,7 @@ else:
                         st.error(f"Error adding user: {e}")
                 else:
                     st.warning("Please provide both username and password.")
-
+            
             # Reset Password
             st.subheader("Reset Password")
             reset_username = st.text_input("Username to Reset", key="reset_username")
@@ -74,7 +74,7 @@ else:
                         st.error(f"Error resetting password: {e}")
                 else:
                     st.warning("Please provide both username and new password.")
-
+            
             # Delete User
             st.subheader("Delete User")
             delete_username = st.text_input("Username to Delete", key="delete_username")
@@ -87,7 +87,7 @@ else:
                         st.error(f"Error deleting user: {e}")
                 else:
                     st.warning("Please provide a username to delete.")
-
+            
             # Show Existing Users
             st.subheader("Existing Users")
             try:
