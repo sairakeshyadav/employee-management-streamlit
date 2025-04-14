@@ -13,6 +13,24 @@ if not os.path.exists("attendance.csv"):
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
 
+# --- FUNCTION TO LOAD USERS ---
+def load_users():
+    users = {}
+    if os.path.exists("users.txt") and os.stat("users.txt").st_size > 0:
+        with open("users.txt", "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) == 3:
+                    username, password, role = parts
+                    users[username] = {"password": password, "role": role}
+                else:
+                    st.warning(f"Ignoring invalid user line: {line.strip()}")
+    else:
+        # If no users exist, write the default admin user
+        with open("users.txt", "w") as f:
+            f.write(f"{ADMIN_USERNAME},{ADMIN_PASSWORD},admin\n")
+    return users
+
 # --- LOGIN ---
 def login():
     st.title("👥 Employee Manager Login")
@@ -24,12 +42,20 @@ def login():
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
         if submitted:
+            users = load_users()  # Load users from the file
             if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
                 st.session_state["logged_in"] = True
                 st.session_state["username"] = username
                 st.session_state["role"] = "admin"
                 st.session_state.login_failed = False
                 st.success("Login successful. Please reload the page.")
+                st.stop()
+            elif username in users and users[username]["password"] == password:
+                st.session_state["logged_in"] = True
+                st.session_state["username"] = username
+                st.session_state["role"] = users[username]["role"]
+                st.session_state.login_failed = False
+                st.success("Login successful.")
                 st.stop()
             else:
                 st.session_state.login_failed = True
@@ -138,9 +164,11 @@ else:
             new_role = st.selectbox("Role", ["employee", "admin"])
             add_user_btn = st.form_submit_button("Add User")
             if add_user_btn:
+                # Store new user in the users.txt file
                 with open("users.txt", "a") as f:
                     f.write(f"{new_user},{new_pass},{new_role}\n")
                 st.success("User added!")
+                users = load_users()  # Reload users after adding new one
 
         st.subheader("Review Leave Requests")
         leave_df = pd.read_csv("leaves.csv")
