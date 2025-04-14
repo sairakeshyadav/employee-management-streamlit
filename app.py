@@ -57,8 +57,9 @@ else:
     st.sidebar.write(f"Logged in as: {st.session_state['username']} ({st.session_state['role']})")
     if st.sidebar.button("Logout"):
         for key in ["logged_in", "username", "role"]:
-            st.session_state.pop(key, None)
-        st.experimental_rerun()
+            if key in st.session_state:
+                del st.session_state[key]
+        st.stop()  # Stop execution to trigger a clean rerun
 
     if choice == "Dashboard":
         st.title("📊 Employee Analytics Dashboard")
