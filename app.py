@@ -5,9 +5,13 @@ import os
 
 # --- AUTH SETUP USING FILE ---
 def load_users():
+    # Check if the users.txt file exists
     if not os.path.exists("users.txt"):
         with open("users.txt", "w") as f:
-            f.write("admin,adminpass,admin\n")
+            # Add the default admin credentials if the file doesn't exist
+            f.write("admin,admin123,admin\n")
+    
+    # Read the users file and load the user data
     users = {}
     with open("users.txt", "r") as f:
         for line in f:
@@ -182,31 +186,3 @@ else:
             with open("users.txt", "a") as f:
                 f.write(f"{new_user},{new_pass},{new_user_role}\n")
             st.success(f"User {new_user} added successfully!")
-
-        st.subheader("✏️ Edit Existing User")
-        edit_user = st.selectbox("Select User to Edit", list(user_data.keys()))
-        new_pass_edit = st.text_input("New Password for User", key="edit_pass")
-        new_role_edit = st.selectbox("New Role", ["admin", "employee"], key="edit_role")
-
-        if st.button("Update User"):
-            updated_lines = []
-            for u, data in user_data.items():
-                if u == edit_user:
-                    updated_lines.append(f"{u},{new_pass_edit},{new_role_edit}\n")
-                else:
-                    updated_lines.append(f"{u},{data['password']},{data['role']}\n")
-            with open("users.txt", "w") as f:
-                f.writelines(updated_lines)
-            st.success(f"User {edit_user} updated!")
-
-        st.subheader("❌ Delete User")
-        del_user = st.selectbox("Select User to Delete", list(user_data.keys()), key="delete_user")
-        if st.button("Delete User"):
-            updated_lines = [
-                f"{u},{data['password']},{data['role']}\n"
-                for u, data in user_data.items()
-                if u != del_user
-            ]
-            with open("users.txt", "w") as f:
-                f.writelines(updated_lines)
-            st.success(f"User {del_user} deleted!")
