@@ -195,4 +195,13 @@ else:
         st.subheader("Review Leave Requests")
         leave_df = pd.read_csv("leaves.csv")
         for idx, row in leave_df[leave_df["Status"] == "Pending"].iterrows():
-            st.write(f"User: {row['Username']} | From: {row['From']} | To: {
+            st.write(f"User: {row['Username']} | From: {row['From']} | To: {row['To']} | Reason: {row['Reason']}")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"Approve {idx}"):
+                    leave_df.at[idx, "Status"] = "Approved"
+            with col2:
+                if st.button(f"Reject {idx}"):
+                    leave_df.at[idx, "Status"] = "Rejected"
+        leave_df.to_csv("leaves.csv", index=False)
+        st.success("Leave requests updated.")
