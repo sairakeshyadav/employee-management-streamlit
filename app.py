@@ -6,7 +6,7 @@ import os
 # --- AUTH SETUP USING FILE ---
 def load_users():
     default_user = "admin,admin123,admin"
-    if not os.path.exists("users.txt"):
+    if not os.path.exists("users.txt") or os.stat("users.txt").st_size == 0:
         with open("users.txt", "w") as f:
             f.write(default_user + "\n")
     users = {}
@@ -42,13 +42,13 @@ def login(users):
                 st.session_state["username"] = username
                 st.session_state["role"] = users[username]["role"]
                 st.session_state.login_failed = False
-                st.success("Login successful. Please click login again and have some fun kiddoo.")
+                st.success("Login successful. Please reload the page.")
                 st.stop()
             else:
                 st.session_state.login_failed = True
 
     if st.session_state.login_failed:
-        st.error("ah look whos trying to login xD")
+        st.error("Invalid credentials")
 
 # --- MAIN APP ---
 users = load_users()
@@ -78,7 +78,7 @@ else:
         st.dataframe(emp_df.describe(include='all'))
 
     elif choice == "Attendance":
-        st.title("🗕️ Attendance Tracking")
+        st.title("🔕️ Attendance Tracking")
         att_df = pd.read_csv("attendance.csv")
         st.dataframe(att_df)
         st.subheader("📄 Export Attendance Data")
