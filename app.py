@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 from datetime import date
-import uuid
 
 # --- DATABASE SETTINGS ---
 DB_FILE = "employee_management.db"
@@ -49,6 +48,13 @@ def initialize_database():
             role TEXT NOT NULL
         )
     """)
+
+    # Add role column if it does not exist
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
+    except sqlite3.OperationalError:
+        # Ignore if the column already exists
+        pass
 
     # Add default admin credentials if not already present
     cursor.execute("SELECT * FROM users WHERE username = ?", (DEFAULT_ADMIN_USERNAME,))
