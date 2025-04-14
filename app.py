@@ -1,182 +1,100 @@
-import streamlit as st
-import pandas as pd
-import os
-from datetime import date
-
-# --- USER MANAGEMENT (No Auth Setup Using File) ---
-def load_users():
-    users = {}
-    
-    # If the file doesn't exist or is empty, create it with a default admin user
-    if not os.path.exists("users.txt") or os.stat("users.txt").st_size == 0:
-        default_user = "admin,admin123,admin"
-        with open("users.txt", "w") as f:
-            f.write(default_user + "\n")  # Ensure there's no extra newline or spaces
-    
-    # Read users from the file
-    with open("users.txt", "r") as f:
-        for line in f:
-            # Strip any leading/trailing whitespace characters
-            parts = line.strip().split(",")
-            if len(parts) == 3:
-                username, password, role = parts
-                users[username] = {"password": password, "role": role}
-            else:
-                st.warning(f"Ignoring invalid user line: {line.strip()}")
-    
-    return users
-
-# --- DATA SETUP ---
-if not os.path.exists("employees.csv"):
-    pd.DataFrame(columns=["ID", "Name", "Department", "Join Date", "Role"]).to_csv("employees.csv", index=False)
-if not os.path.exists("attendance.csv"):
-    pd.DataFrame(columns=["ID", "Name", "Date", "Status"]).to_csv("attendance.csv", index=False)
-
-# --- LOGIN ---
-def login(users):
-    st.title("👥 Employee Manager Login")
-    if "login_failed" not in st.session_state:
-        st.session_state.login_failed = False
-
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Login")
-        
-        # Debugging: Print to see what username and password are entered
-        if submitted:
-            print(f"Attempting login for: {username}, Password: {password}")
-            
-            if username in users and users[username]["password"] == password:
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = username
-                st.session_state["role"] = users[username]["role"]
-                st.session_state.login_failed = False
-                st.success("Login successful. Please reload the page.")
-                st.experimental_rerun()
-            else:
-                st.session_state.login_failed = True
-
-    if st.session_state.login_failed:
-        st.error("Invalid credentials")
-
-# --- MAIN APP ---
-users = load_users()
-if "logged_in" not in st.session_state:
-    login(users)
+if not st.session_state["logged_in"]:
+    login()
 else:
-    st.sidebar.title("Navigation")
-    tabs = ["Dashboard", "Attendance", "Employees", "Leave Management"]
-    if st.session_state["role"] in ["admin", "manager"]:
-        tabs.append("Admin Panel")
+    # Sidebar for logout and user details
+    st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
+    st.sidebar.success(f"Logged in as: {st.session_state['username']}")
 
-    choice = st.sidebar.radio("Go to", tabs)
+    # Tabs for the app
+    if st.session_state["role"] == "admin":
+        tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
+    else:
+        tabs = st.tabs(["Dashboard", "Employees", "Attendance"])
 
-    st.sidebar.write(f"Logged in as: {st.session_state['username']} ({st.session_state['role']})")
-    if st.sidebar.button("Logout"):
-        for key in ["logged_in", "username", "role"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.experimental_rerun()
-
-    if choice == "Dashboard" and st.session_state["role"] in ["admin", "manager"]:
-        st.title("📊 Employee Analytics Dashboard")
-        emp_df = pd.read_csv("employees.csv")
-        att_df = pd.read_csv("attendance.csv")
-        st.metric("Total Employees", len(emp_df))
-        st.metric("Attendance Records", len(att_df))
-        st.dataframe(emp_df.describe(include='all'))
-
-    elif choice == "Attendance" and st.session_state["role"] in ["admin", "manager"]:
-        st.title("🔕️ Attendance Tracking")
-        att_df = pd.read_csv("attendance.csv")
-        st.dataframe(att_df)
-        st.subheader("📄 Export Attendance Data")
-        if not att_df.empty:
-            csv_attendance = att_df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download Attendance CSV", csv_attendance, "attendance_export.csv", "text/csv")
-        else:
-            st.info("No attendance data available to export.")
-
-    elif choice == "Employees" and st.session_state["role"] in ["admin", "manager"]:
-        st.title("🧾 Employee Directory")
-        emp_df = pd.read_csv("employees.csv")
-        if not emp_df.empty:
-            department_filter = st.selectbox("Filter by Department", ["All"] + emp_df["Department"].unique().tolist())
-            if department_filter != "All":
-                filtered = emp_df[emp_df["Department"] == department_filter]
+    # Dashboard Tab
+    with tabs[0]:
+        st.title("Dashboard")
+        try:
+            df = load_data("SELECT * FROM employees")
+            if not df.empty:
+                st.dataframe(df)
             else:
-                filtered = emp_df
-            st.dataframe(filtered)
-            st.subheader("📄 Export Employee Data")
-            csv_employees = filtered.to_csv(index=False).encode("utf-8")
-            st.download_button("Download Employee CSV", csv_employees, "employee_export.csv", "text/csv")
-        else:
-            st.info("No employee data to export.")
+                st.info("No employee data available.")
+        except Exception as e:
+            st.error(f"Error loading dashboard data: {e}")
 
-    elif choice == "Leave Management":
-        st.title("📝 Leave Management")
-        if not os.path.exists("leaves.csv"):
-            pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
-        leave_df = pd.read_csv("leaves.csv")
+    # Employees Tab
+    with tabs[1]:
+        st.title("Employees")
+        st.info("Employee management functionality goes here.")
 
-        st.subheader("Apply for Leave")
-        with st.form("leave_form"):
-            from_date = st.date_input("From Date")
-            to_date = st.date_input("To Date")
-            reason = st.text_area("Reason")
-            submit_leave = st.form_submit_button("Submit")
-            if submit_leave:
-                new_leave = pd.DataFrame([[st.session_state['username'], from_date, to_date, reason, "Pending"]],
-                                         columns=["Username", "From", "To", "Reason", "Status"])
-                leave_df = pd.concat([leave_df, new_leave], ignore_index=True)
-                leave_df.to_csv("leaves.csv", index=False)
-                st.success("Leave request submitted.")
+    # Attendance Tab
+    with tabs[2]:
+        st.title("Attendance")
+        st.info("Attendance tracking functionality goes here.")
 
-        st.subheader("Leave History")
-        st.dataframe(leave_df[leave_df["Username"] == st.session_state["username"]])
+    # Admin Management Tab (only visible for admin users)
+    if st.session_state["role"] == "admin":
+        with tabs[3]:
+            st.title("Admin Management")
+            
+            # Add User
+            st.subheader("Add New User")
+            new_username = st.text_input("New Username")
+            new_password = st.text_input("New Password", type="password", placeholder="Enter password for new user")
+            new_role = st.selectbox("Role", ["admin", "user"])
+            if st.button("Add User"):
+                if new_username and new_password:
+                    try:
+                        execute_query(
+                            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                            (new_username, new_password, new_role),
+                        )
+                        st.success(f"User '{new_username}' added successfully!")
+                    except Exception as e:
+                        st.error(f"Error adding user: {e}")
+                else:
+                    st.warning("Please provide both username and password.")
 
-    elif choice == "Admin Panel" and st.session_state["role"] in ["admin"]:
-        st.title("⚙️ Admin Panel")
+            # Reset Password
+            st.subheader("Reset Password")
+            reset_username = st.text_input("Username to Reset", key="reset_username")
+            reset_new_password = st.text_input(
+                "New Password", type="password", placeholder="Enter new password", key="reset_new_password"
+            )
+            if st.button("Reset Password"):
+                if reset_username and reset_new_password:
+                    try:
+                        execute_query(
+                            "UPDATE users SET password = ? WHERE username = ?",
+                            (reset_new_password, reset_username),
+                        )
+                        st.success(f"Password for '{reset_username}' has been reset.")
+                    except Exception as e:
+                        st.error(f"Error resetting password: {e}")
+                else:
+                    st.warning("Please provide both username and new password.")
 
-        st.subheader("Add New Employee")
-        with st.form("add_emp"):
-            emp_id = st.text_input("Employee ID")
-            name = st.text_input("Name")
-            dept = st.text_input("Department")
-            join = st.date_input("Join Date", date.today())
-            role = st.selectbox("Role", ["employee", "admin"])
-            submitted = st.form_submit_button("Add Employee")
-            if submitted:
-                new_emp = pd.DataFrame([[emp_id, name, dept, join, role]],
-                                       columns=["ID", "Name", "Department", "Join Date", "Role"])
-                emp_df = pd.read_csv("employees.csv")
-                emp_df = pd.concat([emp_df, new_emp], ignore_index=True)
-                emp_df.to_csv("employees.csv", index=False)
-                st.success("Employee added!")
+            # Delete User
+            st.subheader("Delete User")
+            delete_username = st.text_input("Username to Delete", key="delete_username")
+            if st.button("Delete User"):
+                if delete_username:
+                    try:
+                        execute_query("DELETE FROM users WHERE username = ?", (delete_username,))
+                        st.success(f"User '{delete_username}' has been deleted.")
+                    except Exception as e:
+                        st.error(f"Error deleting user: {e}")
+                else:
+                    st.warning("Please provide a username to delete.")
 
-        st.subheader("Add New User")
-        with st.form("add_user"):
-            new_user = st.text_input("Username")
-            new_pass = st.text_input("Password", type="password")
-            new_role = st.selectbox("Role", ["employee", "manager", "admin"])
-            add_user_btn = st.form_submit_button("Add User")
-            if add_user_btn:
-                with open("users.txt", "a") as f:
-                    f.write(f"{new_user},{new_pass},{new_role}\n")
-                st.success("User added!")
-                users = load_users()  # Reload users after adding new one
-
-        st.subheader("Review Leave Requests")
-        leave_df = pd.read_csv("leaves.csv")
-        for idx, row in leave_df[leave_df["Status"] == "Pending"].iterrows():
-            st.write(f"User: {row['Username']} | From: {row['From']} | To: {row['To']} | Reason: {row['Reason']}")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"Approve {idx}"):
-                    leave_df.at[idx, "Status"] = "Approved"
-            with col2:
-                if st.button(f"Reject {idx}"):
-                    leave_df.at[idx, "Status"] = "Rejected"
-        leave_df.to_csv("leaves.csv", index=False)
-        st.success("Leave requests updated.")
+            # Show Existing Users
+            st.subheader("Existing Users")
+            try:
+                user_df = load_data("SELECT * FROM users")
+                if not user_df.empty:
+                    st.dataframe(user_df)
+                else:
+                    st.info("No users found.")
+            except Exception as e:
+                st.error(f"Error loading user data: {e}")
