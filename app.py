@@ -7,12 +7,17 @@ import uuid
 # --- DATABASE SETTINGS ---
 DB_FILE = "employee_management.db"
 
-# --- INITIALIZE DATABASE ---
+# --- DEFAULT ADMIN CREDENTIALS ---
+DEFAULT_ADMIN_USERNAME = "admin"
+DEFAULT_ADMIN_PASSWORD = "admin123"
+
+# --- DATABASE INITIALIZATION ---
 def initialize_database():
     """Initialize the database and create necessary tables."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    # Employees table
+    
+    # Create employees table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS employees (
             id TEXT PRIMARY KEY,
@@ -24,7 +29,8 @@ def initialize_database():
             doj TEXT NOT NULL
         )
     """)
-    # Attendance table
+    
+    # Create attendance table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,22 +40,31 @@ def initialize_database():
             FOREIGN KEY (employee_id) REFERENCES employees (id)
         )
     """)
-    # Users table
+    
+    # Create users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL
         )
     """)
+    
+    # Add default admin credentials if not already present
+    cursor.execute("SELECT * FROM users WHERE username = ?", (DEFAULT_ADMIN_USERNAME,))
+    if cursor.fetchone() is None:
+        cursor.execute("""
+            INSERT INTO users (username, password)
+            VALUES (?, ?)
+        """, (DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD))
+        st.info("Default admin credentials added: Username='admin', Password='admin123'")
+    
     conn.commit()
     conn.close()
-
 
 # --- DATABASE CONNECTION ---
 def get_connection():
     """Get a connection to the database."""
     return sqlite3.connect(DB_FILE)
-
 
 # --- DATABASE OPERATIONS ---
 def load_employee_data():
@@ -61,8 +76,7 @@ def load_employee_data():
         return df
     except Exception as e:
         st.error(f"Error loading employee data: {e}")
-        return pd.DataFrame()  # Return an empty DataFrame
-
+        return pd.DataFrame()
 
 def save_employee(employee):
     """Save a new employee to the database."""
@@ -77,7 +91,6 @@ def save_employee(employee):
         conn.close()
     except Exception as e:
         st.error(f"Error saving employee: {e}")
-
 
 def update_employee(employee_id, updated_data):
     """Update an employee's information in the database."""
@@ -94,7 +107,6 @@ def update_employee(employee_id, updated_data):
     except Exception as e:
         st.error(f"Error updating employee: {e}")
 
-
 def delete_employee(employee_id):
     """Delete an employee from the database."""
     try:
@@ -106,7 +118,6 @@ def delete_employee(employee_id):
     except Exception as e:
         st.error(f"Error deleting employee: {e}")
 
-
 def load_users():
     """Load user data from the database."""
     try:
@@ -116,8 +127,7 @@ def load_users():
         return df
     except Exception as e:
         st.error(f"Error loading users: {e}")
-        return pd.DataFrame()  # Return an empty DataFrame
-
+        return pd.DataFrame()
 
 def add_user(username, password):
     """Add a new user to the database."""
@@ -132,7 +142,6 @@ def add_user(username, password):
         conn.close()
     except Exception as e:
         st.error(f"Error adding user: {e}")
-
 
 def reset_password(username, new_password):
     """Reset a user's password."""
@@ -149,7 +158,6 @@ def reset_password(username, new_password):
     except Exception as e:
         st.error(f"Error resetting password: {e}")
 
-
 def delete_user(username):
     """Delete a user from the database."""
     try:
@@ -161,7 +169,6 @@ def delete_user(username):
     except Exception as e:
         st.error(f"Error deleting user: {e}")
 
-
 # --- STREAMLIT APP ---
 # Initialize the database
 initialize_database()
@@ -171,7 +178,6 @@ if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
-
 
 def login():
     """User login interface."""
@@ -191,7 +197,6 @@ def login():
             st.success(f"Welcome {username}!")
         else:
             st.error("Invalid credentials")
-
 
 if not st.session_state["logged_in"]:
     login()
