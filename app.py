@@ -7,7 +7,7 @@ import os
 def load_users():
     if not os.path.exists("users.txt"):
         with open("users.txt", "w") as f:
-            f.write("admin,adminpass,admin\n")
+            f.write("admin,admin123,admin\n")
     users = {}
     with open("users.txt", "r") as f:
         for line in f:
@@ -72,11 +72,15 @@ def save_attendance_record(record):
 users = load_users()
 
 # --- SESSION MANAGEMENT ---
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-    st.session_state["username"] = ""
-    st.session_state["name"] = ""
-    st.session_state["role"] = ""
+defaults = {
+    "logged_in": False,
+    "username": "",
+    "name": "",
+    "role": ""
+}
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 if not st.session_state["logged_in"]:
     login(users)
@@ -85,7 +89,6 @@ else:
     name = st.session_state["name"]
     role = st.session_state["role"]
 
-    # Top right logout button
     st.markdown("""
         <style>
         .logout-button { position: absolute; top: 10px; right: 10px; }
@@ -103,10 +106,9 @@ else:
         tab_labels.append("\U0001F6E0️ Admin Panel")
     tabs = st.tabs(tab_labels)
 
-    # Load employee data
     df = load_employee_data()
 
-    with tabs[0]:  # Dashboard
+    with tabs[0]:
         st.title("\U0001F4CA Dashboard Overview")
         if not df.empty:
             st.subheader("Employees by Department")
@@ -114,7 +116,7 @@ else:
         else:
             st.info("No employee data available.")
 
-    with tabs[1]:  # Attendance
+    with tabs[1]:
         st.title("\U0001F4C5 Mark Attendance")
         today = date.today().isoformat()
         att_df = load_attendance_data()
@@ -143,7 +145,7 @@ else:
         else:
             st.info("No employees to mark attendance for.")
 
-    with tabs[2]:  # Leaves
+    with tabs[2]:
         st.title("\U0001F4DD Apply for Leave")
         if not df.empty:
             emp_name = st.selectbox("Select Employee", df['name'])
@@ -153,14 +155,14 @@ else:
         else:
             st.info("No employees available.")
 
-    with tabs[3]:  # Employees
+    with tabs[3]:
         st.title("\U0001F465 Employee Directory")
         search = st.text_input("Search by name")
         filtered = df[df['name'].str.contains(search, case=False, na=False)]
         st.dataframe(filtered)
 
     if role == "admin":
-        with tabs[4]:  # Admin Panel
+        with tabs[4]:
             st.markdown("---")
             st.header("\U0001F6E0️ Admin Panel – Manage Employees")
 
