@@ -21,6 +21,18 @@ def load_users():
                 users[username] = {"password": password, "role": role}
             else:
                 st.warning(f"Ignoring invalid user line: {line.strip()}")
+    
+    # Clean the file by removing any invalid lines
+    with open("users.txt", "r") as f:
+        lines = f.readlines()
+    
+    with open("users.txt", "w") as f:
+        for line in lines:
+            if len(line.strip().split(",")) == 3:
+                f.write(line)
+            else:
+                st.warning(f"Removing invalid user line: {line.strip()}")
+    
     return users
 
 def login(users):
