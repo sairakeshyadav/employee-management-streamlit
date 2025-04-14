@@ -1,4 +1,3 @@
-# Full `app.py` with default admin functionality added
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -47,7 +46,13 @@ def hash_password(password):
 
 def verify_password(password, hashed_password):
     """Verify a password against its hash using bcrypt."""
-    return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
+    try:
+        # Convert hashed_password to bytes if it's stored as a string
+        hashed_password = hashed_password.encode('utf-8') if isinstance(hashed_password, str) else hashed_password
+        return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
+    except ValueError as e:
+        st.error(f"Password verification failed: {e}")
+        return False
 
 def validate_input(username, password):
     """Validate input for username and password."""
@@ -121,4 +126,98 @@ else:
     # Sidebar for logout and user details
     st.sidebar.button("Logout", on_click=lambda: st.session_state.clear())
     st.sidebar.success(f"Logged in as: {st.session_state['username']}")
-    # Application tabs follow...
+    
+    # Tabs for the app
+    if st.session_state["role"] == "admin":
+        tabs = st.tabs(["Dashboard", "Employees", "Attendance", "Admin Management"])
+    else:
+        tabs = st.tabs(["Dashboard", "Employees", "Attendance"])
+    
+    # Dashboard Tab
+    with tabs[0]:
+        st.title("Dashboard")
+        try:
+            df = load_data("SELECT * FROM employees")
+            if not df.empty:
+                st.dataframe(df)
+            else:
+                st.info("No employee data available.")
+        except Exception as e:
+            st.error(f"Error loading dashboard data: {e}")
+    
+    # Employees Tab
+    with tabs[1]:
+        st.title("Employees")
+        st.info("Employee management functionality goes here.")
+    
+    # Attendance Tab
+    with tabs[2]:
+        st.title("Attendance")
+        st.info("Attendance tracking functionality goes here.")
+    
+    # Admin Management Tab (only visible for admin users)
+    if st.session_state["role"] == "admin":
+        with tabs[3]:
+            st.title("Admin Management")
+            
+            # Add User
+            st.subheader("Add New User")
+            new_username = st.text_input("New Username")
+            new_password = st.text_input("New Password", type="password", placeholder="Enter password for new user")
+            new_role = st.selectbox("Role", ["admin", "user"])
+            if st.button("Add User"):
+                if validate_input(new_username, new_password):
+                    try:
+                        hashed_password = hash_password(new_password)
+                        execute_query(
+                            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                            (new_username, hashed_password, new_role),
+                        )
+                        st.success(f"User '{new_username}' added successfully!")
+                    except Exception as e:
+                        st.error(f"Error adding user: {e}")
+            
+            # Reset Password
+            st.subheader("Reset Password")
+            reset_username = st.text_input("Username to Reset", key="reset_username")
+            reset_new_password = st.text_input(
+                "New Password", type="password", placeholder="Enter new password", key="reset_new_password"
+            )
+            if st.button("Reset Password"):
+                if validate_input(reset_username, reset_new_password):
+                    try:
+                        hashed_password = hash_password(reset_new_password)
+                        execute_query(
+                            "UPDATE users SET password = ? WHERE username = ?",
+                            (hashed_password, reset_username),
+                        )
+                        st.success(f"Password for '{reset_username}' has been reset.")
+                    except Exception as e:
+                        st.error(f"Error resetting password: {e}")
+            
+            # Delete User
+            st.subheader("Delete User")
+            delete_username = st.text_input("Username to Delete", key="delete_username")
+            if st.button("Delete User"):
+                if delete_username:
+                    if st.warning("Are you sure you want to delete this user?"):
+                        try:
+                            execute_query("DELETE FROM users WHERE username = ?", (delete_username,))
+                            st.success(f"User '{delete_username}' has been deleted.")
+                        except Exception as e:
+                            st.error(f"Error deleting user: {e}")
+                    else:
+                        st.info("User deletion canceled.")
+                else:
+                    st.warning("Please provide a username to delete.")
+            
+            # Show Existing Users
+            st.subheader("Existing Users")
+            try:
+                user_df = load_data("SELECT username, role FROM users")
+                if not user_df.empty:
+                    st.dataframe(user_df)
+                else:
+                    st.info("No users found.")
+            except Exception as e:
+                st.error(f"Error loading user data: {e}")
