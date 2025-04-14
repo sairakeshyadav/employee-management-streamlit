@@ -5,13 +5,9 @@ import os
 
 # --- AUTH SETUP USING FILE ---
 def load_users():
-    # Check if the users.txt file exists
     if not os.path.exists("users.txt"):
         with open("users.txt", "w") as f:
-            # Add the default admin credentials if the file doesn't exist
             f.write("admin,admin123,admin\n")
-    
-    # Read the users file and load the user data
     users = {}
     with open("users.txt", "r") as f:
         for line in f:
@@ -21,21 +17,6 @@ def load_users():
                 users[username] = {"password": password, "role": role}
             else:
                 st.warning(f"Ignoring invalid user line: {line.strip()}")
-    
-    # Debugging: Print out the loaded users to confirm credentials
-    st.write("Loaded users from users.txt:", users)
-    
-    # Clean the file by removing any invalid lines
-    with open("users.txt", "r") as f:
-        lines = f.readlines()
-    
-    with open("users.txt", "w") as f:
-        for line in lines:
-            if len(line.strip().split(",")) == 3:
-                f.write(line)
-            else:
-                st.warning(f"Removing invalid user line: {line.strip()}")
-    
     return users
 
 def login(users):
@@ -47,14 +28,12 @@ def login(users):
     st.title("Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
-    
     if st.button("Login"):
         if username in users and users[username]["password"] == password:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["name"] = username.capitalize()
             st.session_state["role"] = users[username]["role"]
-            st.success(f"Logged in as {username}")
         else:
             st.error("Invalid credentials")
 
@@ -75,6 +54,7 @@ def load_employee_data():
 def save_employee_data(df):
     df.to_csv(EMPLOYEE_FILE, index=False)
 
+# Load users and manage login state
 users = load_users()
 
 # --- SESSION MANAGEMENT ---
@@ -203,3 +183,4 @@ else:
             with open("users.txt", "a") as f:
                 f.write(f"{new_user},{new_pass},{new_user_role}\n")
             st.success(f"User {new_user} added successfully!")
+
