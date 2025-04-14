@@ -3,35 +3,18 @@ import pandas as pd
 from datetime import date
 import os
 
-# --- AUTH SETUP USING FILE ---
-def load_users():
-    # Set default admin credentials if the file doesn't exist or is empty
-    default_user = "admin,admin123,admin"
-    if not os.path.exists("users.txt") or os.stat("users.txt").st_size == 0:
-        with open("users.txt", "w") as f:
-            f.write(default_user + "\n")
-
-    users = {}
-    with open("users.txt", "r") as f:
-        for line in f:
-            parts = line.strip().split(",")
-            if len(parts) == 3:
-                username, password, role = parts
-                users[username] = {"password": password, "role": role}
-            else:
-                st.warning(f"Ignoring invalid user line: {line.strip()}")
-    return users
-
 # --- DATA SETUP ---
 if not os.path.exists("employees.csv"):
     pd.DataFrame(columns=["ID", "Name", "Department", "Join Date", "Role"]).to_csv("employees.csv", index=False)
 if not os.path.exists("attendance.csv"):
     pd.DataFrame(columns=["ID", "Name", "Date", "Status"]).to_csv("attendance.csv", index=False)
-if not os.path.exists("leaves.csv"):
-    pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
+
+# --- DEFAULT ADMIN CREDENTIALS ---
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin123"
 
 # --- LOGIN ---
-def login(users):
+def login():
     st.title("👥 Employee Manager Login")
     if "login_failed" not in st.session_state:
         st.session_state.login_failed = False
@@ -41,10 +24,10 @@ def login(users):
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
         if submitted:
-            if username in users and users[username]["password"] == password:
+            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
                 st.session_state["logged_in"] = True
                 st.session_state["username"] = username
-                st.session_state["role"] = users[username]["role"]
+                st.session_state["role"] = "admin"
                 st.session_state.login_failed = False
                 st.success("Login successful. Please reload the page.")
                 st.stop()
@@ -55,9 +38,8 @@ def login(users):
         st.error("Invalid credentials")
 
 # --- MAIN APP ---
-users = load_users()
 if "logged_in" not in st.session_state:
-    login(users)
+    login()
 else:
     st.sidebar.title("Navigation")
     tabs = ["Dashboard", "Attendance", "Employees", "Leave Management"]
@@ -110,6 +92,8 @@ else:
 
     elif choice == "Leave Management":
         st.title("📝 Leave Management")
+        if not os.path.exists("leaves.csv"):
+            pd.DataFrame(columns=["Username", "From", "To", "Reason", "Status"]).to_csv("leaves.csv", index=False)
         leave_df = pd.read_csv("leaves.csv")
 
         st.subheader("Apply for Leave")
@@ -157,7 +141,6 @@ else:
                 with open("users.txt", "a") as f:
                     f.write(f"{new_user},{new_pass},{new_role}\n")
                 st.success("User added!")
-                users = load_users()  # Reload users after adding new one
 
         st.subheader("Review Leave Requests")
         leave_df = pd.read_csv("leaves.csv")
